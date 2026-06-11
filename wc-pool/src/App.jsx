@@ -376,6 +376,12 @@ export default function App() {
     const idx = (await sGet(K_PLAYERS)) || {}; idx[id] = clean; await sSet(K_PLAYERS, idx); setPlayers(idx);
     setPlayerId(id); setPlayerName(clean);
   }
+  async function toggleEditingOpen() {
+    const cur = (await sGet(K_RESULTS)) || emptyResults();
+    cur.editingOpen = !cur.editingOpen;
+    await sSet(K_RESULTS, cur); setResults({ ...emptyResults(), ...cur });
+    flash(cur.editingOpen ? "Editing is open — players can update their picks." : "Editing closed — picks are locked again.");
+  }
   async function toggleReveal() {
     const cur = (await sGet(K_RESULTS)) || emptyResults();
     cur.revealed = !cur.revealed;
@@ -395,7 +401,7 @@ export default function App() {
     if (lock) setLocked(true);
     flash(lock ? "Picks locked in." : "Saved.");
   }
-  const editable = !locked && !pastDeadline;
+  const editable = !locked && (!pastDeadline || !!results.editingOpen);
   function setScorePick(m, hg, ag) {
     if (!editable) return;
     setPicks((p) => { const scores = { ...(p.scores || {}) }; if (hg === null) delete scores[m]; else scores[m] = { hg, ag }; return { ...p, scores }; });
@@ -474,7 +480,7 @@ export default function App() {
 
   return (
     <Shell>
-      <Header tab={tab} setTab={setTab} pastDeadline={pastDeadline} deadline={deadline} now={now} feedStatus={feedStatus} feedAt={results.feedAt} onReset={handleReset} confirmReset={confirmReset} />
+      <Header tab={tab} setTab={setTab} pastDeadline={pastDeadline} deadline={deadline} now={now} feedStatus={feedStatus} feedAt={results.feedAt} onReset={handleReset} confirmReset={confirmReset} editingOpen={!!results.editingOpen} />
       {toast && <div style={{ position: "sticky", top: 0, zIndex: 5, background: C.ink, color: C.chalk, padding: "8px 14px", fontSize: 13, fontWeight: 600 }}>{toast}</div>}
       {tab === "play" && (!playerId
         ? <Join nameInput={nameInput} setNameInput={setNameInput} onJoin={joinAs} players={players} />
@@ -483,7 +489,7 @@ export default function App() {
       {tab === "standings" && <Standings rows={standRows} autoReady={qual.allComplete} />}
       {tab === "league" && <LeaguePicks entries={leagueEntries} revealed={results.revealed} />}
       {tab === "results" && (playerId
-        ? <Results results={results} setScore={setScore} toggleResultAdvance={toggleResultAdvance} qual={qual} setManualOrder={setManualOrder} setManualThird={setManualThird} feedStatus={feedStatus} feedAt={results.feedAt} onToggleReveal={toggleReveal} confirmReveal={confirmReveal} setConfirmReveal={setConfirmReveal} />
+        ? <Results results={results} setScore={setScore} toggleResultAdvance={toggleResultAdvance} qual={qual} setManualOrder={setManualOrder} setManualThird={setManualThird} feedStatus={feedStatus} feedAt={results.feedAt} onToggleReveal={toggleReveal} confirmReveal={confirmReveal} setConfirmReveal={setConfirmReveal} onToggleEditing={toggleEditingOpen} />
         : <div style={{ padding: "30px 18px", color: C.mute }}>Enter your name on the My Picks tab first, so result edits are attributed to you.</div>)}
       <Footer />
     </Shell>
@@ -502,7 +508,7 @@ function Shell({ children }) {
   );
 }
 
-function Header({ tab, setTab, pastDeadline, deadline, now, feedStatus, feedAt, onReset, confirmReset }) {
+function Header({ tab, setTab, pastDeadline, deadline, now, feedStatus, feedAt, onReset, confirmReset, editingOpen }) {
   const days = Math.max(0, Math.ceil((deadline - now) / 86400000));
   const tabs = [["play", "My Picks"], ["tables", "Group Tables"], ["standings", "Standings"], ["league", "League Picks"], ["results", "Results"]];
   return (
@@ -516,7 +522,7 @@ function Header({ tab, setTab, pastDeadline, deadline, now, feedStatus, feedAt, 
       <Eyebrow><span style={{ color: C.sun }}>FIFA World Cup 2026 · Friends Pool</span></Eyebrow>
       <h1 style={{ fontFamily: "Anton, sans-serif", fontWeight: 400, fontSize: 42, lineHeight: .95, margin: "6px 0 2px" }}>PICK<span style={{ color: C.sun }}>'</span>EM</h1>
       <div style={{ fontSize: 12, color: "#C7D0DE", marginBottom: 4, fontFamily: "'DM Mono', monospace" }}>
-        {pastDeadline ? "PICKS LOCKED · tournament underway" : `Picks lock at the opener · ${days} day${days === 1 ? "" : "s"} left`}
+        {pastDeadline ? (editingOpen ? "EDITING OPEN · update your picks now" : "PICKS LOCKED · tournament underway") : `Picks lock at the opener · ${days} day${days === 1 ? "" : "s"} left`}
       </div>
       <div style={{ fontSize: 10.5, color: feedStatus === "fail" ? "#E59B92" : "#9FE3BE", marginBottom: 12, fontFamily: "'DM Mono', monospace" }}>
         {feedStatus === "fail" ? "auto-feed offline · enter scores manually" : feedAt ? `auto-feed synced ${ago(feedAt)}` : "auto-feed connecting…"}
@@ -611,10 +617,15 @@ function PlayTab({ playerName, picks, editable, locked, pastDeadline, setScorePi
         <div style={{ fontWeight: 700, fontSize: 15 }}>Playing as {playerName}</div>
         <button onClick={onSwitch} style={{ background: "none", border: "none", color: C.mute, fontSize: 12, textDecoration: "underline", cursor: "pointer", fontFamily: "inherit" }}>switch</button>
       </div>
-      {(locked || pastDeadline) && (
+      {!editable && (
         <div style={{ background: C.ink, color: C.chalk, padding: "10px 12px", borderRadius: 3, fontSize: 13, margin: "8px 0 14px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-          <span>{locked ? "Your picks are locked in. Tap Unlock to edit before the tournament starts." : "The deadline has passed — picks are read-only."}</span>
-          {locked && !pastDeadline && <button onClick={onUnlock} style={{ background: C.sun, color: C.ink, border: "none", borderRadius: 2, padding: "7px 12px", fontWeight: 800, fontSize: 12, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>Unlock</button>}
+          <span>{locked ? "Your picks are locked in." : "The deadline has passed — picks are read-only."}{locked && " Tap Unlock to edit."}</span>
+          {locked && <button onClick={onUnlock} style={{ background: C.sun, color: C.ink, border: "none", borderRadius: 2, padding: "7px 12px", fontWeight: 800, fontSize: 12, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>Unlock</button>}
+        </div>
+      )}
+      {editable && pastDeadline && (
+        <div style={{ background: C.pitch, color: C.chalk, padding: "10px 12px", borderRadius: 3, fontSize: 13, margin: "8px 0 14px" }}>
+          Editing is temporarily open — update your picks now. Don't forget to Save when you're done.
         </div>
       )}
       <div style={{ display: "flex", gap: 8, margin: "8px 0 16px" }}>
@@ -851,7 +862,7 @@ function ScoreBox({ value, onChange, disabled }) {
     style={{ width: 42, padding: "8px 4px", textAlign: "center", border: `1.5px solid ${C.ink}`, borderRadius: 2, fontSize: 16, fontFamily: "'DM Mono', monospace" }} />;
 }
 
-function Results({ results, setScore, toggleResultAdvance, qual, setManualOrder, setManualThird, feedStatus, feedAt, onToggleReveal, confirmReveal, setConfirmReveal }) {
+function Results({ results, setScore, toggleResultAdvance, qual, setManualOrder, setManualThird, feedStatus, feedAt, onToggleReveal, confirmReveal, setConfirmReveal, onToggleEditing }) {
   const [view, setView] = useState("scores");
   const done = Object.keys(results.scores).filter((k) => results.scores[k] && results.scores[k].hg != null).length;
   const [draft, setDraft] = useState({});
@@ -869,6 +880,10 @@ function Results({ results, setScore, toggleResultAdvance, qual, setManualOrder,
       <div style={{ background: results.revealed ? "#EAF4EE" : "#F0EBDD", border: `1px solid ${C.line}`, borderRadius: 3, padding: "10px 12px", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
         <span style={{ fontSize: 12.5, color: C.ink }}>{results.revealed ? "Everyone's picks are visible in the League Picks tab." : "Picks are secret. Reveal them once everyone has locked in."}</span>
         <button onClick={() => { if (confirmReveal) { onToggleReveal(); setConfirmReveal(false); } else { setConfirmReveal(true); setTimeout(() => setConfirmReveal(false), 4000); } }} style={{ background: results.revealed ? C.red : C.ink, color: C.chalk, border: "none", borderRadius: 2, padding: "7px 12px", fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>{results.revealed ? (confirmReveal ? "Confirm hide" : "Hide picks") : (confirmReveal ? "Confirm reveal" : "Reveal all picks")}</button>
+      </div>
+      <div style={{ background: results.editingOpen ? "#FBEAE7" : "#F0EBDD", border: `1.5px solid ${results.editingOpen ? C.red : C.line}`, borderRadius: 3, padding: "10px 12px", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+        <span style={{ fontSize: 12.5, color: C.ink }}>{results.editingOpen ? "Editing is OPEN — all players can change their picks right now." : "Picks are locked (deadline passed). Open editing temporarily to let players fix their brackets."}</span>
+        <button onClick={onToggleEditing} style={{ background: results.editingOpen ? C.red : C.ink, color: C.chalk, border: "none", borderRadius: 2, padding: "7px 12px", fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>{results.editingOpen ? "Close editing" : "Open editing"}</button>
       </div>
       <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
         <SegBtn on={view === "scores"} onClick={() => setView("scores")}>Scores <Count>{done}/72</Count></SegBtn>
