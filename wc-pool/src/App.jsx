@@ -497,16 +497,6 @@ export default function App() {
     <Shell>
       <Header tab={tab} setTab={setTab} pastDeadline={pastDeadline} deadline={deadline} now={now} feedStatus={feedStatus} feedAt={results.feedAt} onReset={handleReset} confirmReset={confirmReset} editingOpen={!!results.editingOpen} />
       {toast && <div style={{ position: "sticky", top: 0, zIndex: 5, background: C.ink, color: C.chalk, padding: "8px 14px", fontSize: 13, fontWeight: 600 }}>{toast}</div>}
-      {playerId && (results.announcements || []).length > 0 && tab !== "results" && tab !== "updates" && (
-        <div style={{ padding: "12px 18px 0" }}>
-          {results.announcements.slice(0, 1).map((a, i) => (
-            <div key={i} style={{ background: C.chalk, border: `1.5px solid ${C.sun}`, borderLeft: `4px solid ${C.sun}`, borderRadius: 3, padding: "10px 14px" }}>
-              <div style={{ fontSize: 13, lineHeight: 1.5, color: C.ink, whiteSpace: "pre-wrap" }}>{a.text}</div>
-              <div style={{ fontSize: 10.5, color: C.mute, marginTop: 4, fontFamily: "'DM Mono', monospace" }}>{a.by} · {ago(a.at)}</div>
-            </div>
-          ))}
-        </div>
-      )}
       {tab === "play" && (!playerId
         ? <Join nameInput={nameInput} setNameInput={setNameInput} onJoin={joinAs} players={players} announcements={results.announcements || []} />
         : <PlayTab playerName={playerName} picks={picks} editable={editable} locked={locked} pastDeadline={pastDeadline} setScorePick={setScorePick} toggleAdvance={toggleAdvance} onSave={() => savePicks({ lock: false })} onLock={() => savePicks({ lock: true })} onUnlock={unlockPicks} onSwitch={() => { setPlayerId(null); setNameInput(""); }} />)}
