@@ -6,7 +6,7 @@ import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, onSnapshot } from 
    WORLD CUP 2026 PREDICTION POOL
    ========================================================================= */
 
-const SANDBOX = false;
+const SANDBOX = import.meta.env.DEV;
 const NS = SANDBOX ? "wc26test:" : "wc26:";
 
 const GROUPS = {
@@ -580,12 +580,17 @@ function PlayTab({ playerName, picks, editable, locked, pastDeadline, setScorePi
         <SegBtn on={section === "knockout"} onClick={() => setSection("knockout")}>Knockouts</SegBtn>
       </div>
       {section === "group" ? <GroupPicks picks={picks} editable={editable} setScorePick={setScorePick} myR32info={myR32info} /> : <KnockoutPicks picks={picks} editable={editable} toggleAdvance={toggleAdvance} myR32info={myR32info} />}
-      {editable && (
-        <div style={{ position: "sticky", bottom: 0, background: C.paper, borderTop: `1px solid ${C.line}`, padding: "12px 4px", display: "flex", gap: 10, marginTop: 18 }}>
-          <button onClick={onSave} style={{ flex: 1, background: "transparent", color: C.ink, border: `1.5px solid ${C.ink}`, borderRadius: 2, padding: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Save progress</button>
-          <button onClick={() => { if (confirmLock) { onLock(); setConfirmLock(false); } else { setConfirmLock(true); setTimeout(() => setConfirmLock(false), 4000); } }} style={{ flex: 1, background: confirmLock ? C.red : C.pitch, color: C.chalk, border: "none", borderRadius: 2, padding: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>{confirmLock ? "Tap again to confirm" : "Lock in picks"}</button>
+      {editable ? (
+        <div style={{ position: "sticky", bottom: 0, background: C.paper, borderTop: `1px solid ${C.line}`, padding: "12px 4px", display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
+          <button onClick={onSave} style={{ flex: 1, background: "transparent", color: C.ink, border: `1.5px solid ${C.ink}`, borderRadius: 2, padding: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", minWidth: 120 }}>Save progress</button>
+          {section === "group" && <button onClick={() => { onSave(); setSection("knockout"); }} style={{ flex: 1, background: C.ink, color: C.chalk, border: "none", borderRadius: 2, padding: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", minWidth: 120 }}>Save & go to Knockouts</button>}
+          <button onClick={() => { if (confirmLock) { onLock(); setConfirmLock(false); } else { setConfirmLock(true); setTimeout(() => setConfirmLock(false), 4000); } }} style={{ flex: 1, background: confirmLock ? C.red : C.pitch, color: C.chalk, border: "none", borderRadius: 2, padding: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", minWidth: 120 }}>{confirmLock ? "Tap again to confirm" : "Lock in picks"}</button>
         </div>
-      )}
+      ) : (locked && !pastDeadline) ? (
+        <div style={{ position: "sticky", bottom: 0, background: C.paper, borderTop: `1px solid ${C.line}`, padding: "12px 4px", display: "flex", gap: 10, marginTop: 18 }}>
+          <button onClick={onUnlock} style={{ flex: 1, background: C.sun, color: C.ink, border: "none", borderRadius: 2, padding: "12px", fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>Unlock picks</button>
+        </div>
+      ) : null}
     </div>
   );
 }
