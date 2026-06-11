@@ -497,7 +497,7 @@ export default function App() {
     <Shell>
       <Header tab={tab} setTab={setTab} pastDeadline={pastDeadline} deadline={deadline} now={now} feedStatus={feedStatus} feedAt={results.feedAt} onReset={handleReset} confirmReset={confirmReset} editingOpen={!!results.editingOpen} />
       {toast && <div style={{ position: "sticky", top: 0, zIndex: 5, background: C.ink, color: C.chalk, padding: "8px 14px", fontSize: 13, fontWeight: 600 }}>{toast}</div>}
-      {playerId && (results.announcements || []).length > 0 && tab !== "results" && (
+      {playerId && (results.announcements || []).length > 0 && tab !== "results" && tab !== "updates" && (
         <div style={{ padding: "12px 18px 0" }}>
           {results.announcements.slice(0, 1).map((a, i) => (
             <div key={i} style={{ background: C.chalk, border: `1.5px solid ${C.sun}`, borderLeft: `4px solid ${C.sun}`, borderRadius: 3, padding: "10px 14px" }}>
@@ -513,8 +513,9 @@ export default function App() {
       {tab === "tables" && <Tables qual={qual} />}
       {tab === "standings" && <Standings rows={standRows} autoReady={qual.allComplete} />}
       {tab === "league" && <LeaguePicks entries={leagueEntries} revealed={results.revealed} />}
+      {tab === "updates" && <Updates announcements={results.announcements || []} onPost={postAnnouncement} onDelete={deleteAnnouncement} isCommissioner={!!playerId} />}
       {tab === "results" && (playerId
-        ? <Results results={results} setScore={setScore} toggleResultAdvance={toggleResultAdvance} qual={qual} setManualOrder={setManualOrder} setManualThird={setManualThird} feedStatus={feedStatus} feedAt={results.feedAt} onToggleReveal={toggleReveal} confirmReveal={confirmReveal} setConfirmReveal={setConfirmReveal} onToggleEditing={toggleEditingOpen} onPostAnnouncement={postAnnouncement} onDeleteAnnouncement={deleteAnnouncement} />
+        ? <Results results={results} setScore={setScore} toggleResultAdvance={toggleResultAdvance} qual={qual} setManualOrder={setManualOrder} setManualThird={setManualThird} feedStatus={feedStatus} feedAt={results.feedAt} onToggleReveal={toggleReveal} confirmReveal={confirmReveal} setConfirmReveal={setConfirmReveal} onToggleEditing={toggleEditingOpen} />
         : <div style={{ padding: "30px 18px", color: C.mute }}>Enter your name on the My Picks tab first, so result edits are attributed to you.</div>)}
       <Footer />
     </Shell>
@@ -535,7 +536,7 @@ function Shell({ children }) {
 
 function Header({ tab, setTab, pastDeadline, deadline, now, feedStatus, feedAt, onReset, confirmReset, editingOpen }) {
   const days = Math.max(0, Math.ceil((deadline - now) / 86400000));
-  const tabs = [["play", "My Picks"], ["tables", "Group Tables"], ["standings", "Standings"], ["league", "League Picks"], ["results", "Results"]];
+  const tabs = [["play", "My Picks"], ["tables", "Group Tables"], ["standings", "Standings"], ["league", "League Picks"], ["updates", "Updates"], ["results", "Results"]];
   return (
     <div style={{ background: C.ink, color: C.chalk, padding: "22px 14px 0" }}>
       {SANDBOX && (
@@ -900,11 +901,10 @@ function ScoreBox({ value, onChange, disabled }) {
     style={{ width: 42, padding: "8px 4px", textAlign: "center", border: `1.5px solid ${C.ink}`, borderRadius: 2, fontSize: 16, fontFamily: "'DM Mono', monospace" }} />;
 }
 
-function Results({ results, setScore, toggleResultAdvance, qual, setManualOrder, setManualThird, feedStatus, feedAt, onToggleReveal, confirmReveal, setConfirmReveal, onToggleEditing, onPostAnnouncement, onDeleteAnnouncement }) {
+function Results({ results, setScore, toggleResultAdvance, qual, setManualOrder, setManualThird, feedStatus, feedAt, onToggleReveal, confirmReveal, setConfirmReveal, onToggleEditing }) {
   const [view, setView] = useState("scores");
   const done = Object.keys(results.scores).filter((k) => results.scores[k] && results.scores[k].hg != null).length;
   const [draft, setDraft] = useState({});
-  const [annText, setAnnText] = useState("");
 
   function commit(m) {
     const d = draft[m]; if (!d || d.hg == null || d.ag == null) return;
@@ -924,11 +924,10 @@ function Results({ results, setScore, toggleResultAdvance, qual, setManualOrder,
         <span style={{ fontSize: 12.5, color: C.ink }}>{results.editingOpen ? "Editing is OPEN — all players can change their picks right now." : "Picks are locked (deadline passed). Open editing temporarily to let players fix their brackets."}</span>
         <button onClick={onToggleEditing} style={{ background: results.editingOpen ? C.red : C.ink, color: C.chalk, border: "none", borderRadius: 2, padding: "7px 12px", fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>{results.editingOpen ? "Close editing" : "Open editing"}</button>
       </div>
-      <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
         <SegBtn on={view === "scores"} onClick={() => setView("scores")}>Scores <Count>{done}/72</Count></SegBtn>
         <SegBtn on={view === "ties"} onClick={() => setView("ties")}>Ties</SegBtn>
         <SegBtn on={view === "advance"} onClick={() => setView("advance")}>Knockouts</SegBtn>
-        <SegBtn on={view === "announce"} onClick={() => setView("announce")}>Announce</SegBtn>
       </div>
 
       {view === "scores" && (
@@ -1003,25 +1002,35 @@ function Results({ results, setScore, toggleResultAdvance, qual, setManualOrder,
         </div>
       )}
 
-      {view === "announce" && (
-        <div>
-          <p style={{ fontSize: 12.5, color: C.mute, lineHeight: 1.5, marginTop: 0 }}>Post updates that appear on the landing page for all players.</p>
-          <textarea value={annText} onChange={(e) => setAnnText(e.target.value)} placeholder="Write an announcement..." rows={3} style={{ width: "100%", padding: 12, border: `1.5px solid ${C.ink}`, borderRadius: 2, fontSize: 14, fontFamily: "inherit", resize: "vertical", marginBottom: 8 }} />
-          <button onClick={() => { onPostAnnouncement(annText); setAnnText(""); }} disabled={!annText.trim()} style={{ background: !annText.trim() ? C.line : C.ink, color: C.chalk, border: "none", borderRadius: 2, padding: "10px 18px", fontWeight: 700, fontSize: 13, cursor: !annText.trim() ? "default" : "pointer", fontFamily: "inherit", marginBottom: 20 }}>Post announcement</button>
-          {(results.announcements || []).length > 0 && (
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>Posted announcements</div>
-              {(results.announcements || []).map((a, i) => (
-                <div key={i} style={{ background: C.chalk, border: `1px solid ${C.line}`, borderLeft: `4px solid ${C.sun}`, borderRadius: 3, padding: "10px 14px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
-                  <div>
-                    <div style={{ fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{a.text}</div>
-                    <div style={{ fontSize: 10.5, color: C.mute, marginTop: 4, fontFamily: "'DM Mono', monospace" }}>{a.by} · {ago(a.at)}</div>
-                  </div>
-                  <button onClick={() => onDeleteAnnouncement(i)} style={{ background: "none", border: "none", color: C.red, fontSize: 12, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, whiteSpace: "nowrap" }}>Remove</button>
-                </div>
-              ))}
+    </div>
+  );
+}
+
+function Updates({ announcements, onPost, onDelete, isCommissioner }) {
+  const [text, setText] = useState("");
+  return (
+    <div style={{ padding: "18px 14px" }}>
+      <Eyebrow>Commissioner updates</Eyebrow>
+      {isCommissioner && (
+        <div style={{ margin: "14px 0 20px" }}>
+          <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Write an update for the league..." rows={3} style={{ width: "100%", padding: 12, border: `1.5px solid ${C.ink}`, borderRadius: 2, fontSize: 14, fontFamily: "inherit", resize: "vertical", marginBottom: 8 }} />
+          <button onClick={() => { onPost(text); setText(""); }} disabled={!text.trim()} style={{ background: !text.trim() ? C.line : C.ink, color: C.chalk, border: "none", borderRadius: 2, padding: "10px 18px", fontWeight: 700, fontSize: 13, cursor: !text.trim() ? "default" : "pointer", fontFamily: "inherit" }}>Post update</button>
+        </div>
+      )}
+      {!isCommissioner && <p style={{ fontSize: 13, color: C.mute, margin: "10px 0 16px" }}>Enter your name on the My Picks tab to post updates.</p>}
+      {announcements.length === 0 ? (
+        <div style={{ color: C.mute, fontSize: 13, marginTop: 16 }}>No updates yet.</div>
+      ) : (
+        <div style={{ marginTop: isCommissioner ? 0 : 8 }}>
+          {announcements.map((a, i) => (
+            <div key={i} style={{ background: C.chalk, border: `1px solid ${C.line}`, borderLeft: `4px solid ${C.sun}`, borderRadius: 3, padding: "10px 14px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+              <div>
+                <div style={{ fontSize: 13.5, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{a.text}</div>
+                <div style={{ fontSize: 10.5, color: C.mute, marginTop: 4, fontFamily: "'DM Mono', monospace" }}>{a.by} · {ago(a.at)}</div>
+              </div>
+              {isCommissioner && <button onClick={() => onDelete(i)} style={{ background: "none", border: "none", color: C.red, fontSize: 12, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, whiteSpace: "nowrap" }}>Remove</button>}
             </div>
-          )}
+          ))}
         </div>
       )}
     </div>
