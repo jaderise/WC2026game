@@ -926,14 +926,11 @@ function Results({ results, setScore, toggleResultAdvance, qual, setManualOrder,
       <div style={{ background: feedStatus === "fail" ? "#FBEAE7" : "#EAF4EE", border: `1px solid ${C.line}`, borderRadius: 3, padding: "10px 12px", fontSize: 12.5, color: C.ink, marginBottom: 14, lineHeight: 1.5 }}>
         {feedStatus === "fail" ? "Auto-feed offline. Enter scores below — your entries always take effect." : `Auto-feed synced ${ago(feedAt)}. It fills scores within ~a day; enter the real score here anytime to update instantly.`}
       </div>
-      <div style={{ background: results.revealed ? "#EAF4EE" : "#F0EBDD", border: `1px solid ${C.line}`, borderRadius: 3, padding: "10px 12px", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-        <span style={{ fontSize: 12.5, color: C.ink }}>{results.revealed ? "Everyone's picks are visible in the League Picks tab." : "Picks are secret. Reveal them once everyone has locked in."}</span>
-        <button onClick={() => { if (confirmReveal) { onToggleReveal(); setConfirmReveal(false); } else { setConfirmReveal(true); setTimeout(() => setConfirmReveal(false), 4000); } }} style={{ background: results.revealed ? C.red : C.ink, color: C.chalk, border: "none", borderRadius: 2, padding: "7px 12px", fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>{results.revealed ? (confirmReveal ? "Confirm hide" : "Hide picks") : (confirmReveal ? "Confirm reveal" : "Reveal all picks")}</button>
-      </div>
-      <div style={{ background: results.editingOpen ? "#FBEAE7" : "#F0EBDD", border: `1.5px solid ${results.editingOpen ? C.red : C.line}`, borderRadius: 3, padding: "10px 12px", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-        <span style={{ fontSize: 12.5, color: C.ink }}>{results.editingOpen ? "Editing is OPEN — all players can change their picks right now." : "Picks are locked (deadline passed). Open editing temporarily to let players fix their brackets."}</span>
-        <button onClick={onToggleEditing} style={{ background: results.editingOpen ? C.red : C.ink, color: C.chalk, border: "none", borderRadius: 2, padding: "7px 12px", fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>{results.editingOpen ? "Close editing" : "Open editing"}</button>
-      </div>
+      {(results.revealed || results.editingOpen) && (
+        <div style={{ fontSize: 11, color: C.mute, marginBottom: 12, fontFamily: "'DM Mono', monospace" }}>
+          {results.revealed ? "picks visible" : ""}{results.revealed && results.editingOpen ? " · " : ""}{results.editingOpen ? "editing open" : ""}
+        </div>
+      )}
       <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
         <SegBtn on={view === "scores"} onClick={() => setView("scores")}>Scores <Count>{done}/72</Count></SegBtn>
         <SegBtn on={view === "ties"} onClick={() => setView("ties")}>Ties</SegBtn>
@@ -1016,6 +1013,17 @@ function Results({ results, setScore, toggleResultAdvance, qual, setManualOrder,
         </div>
       )}
 
+      <div style={{ marginTop: 40, paddingTop: 16, borderTop: `1px solid ${C.line}` }}>
+        <div style={{ fontSize: 10.5, color: C.mute, letterSpacing: ".12em", textTransform: "uppercase", fontWeight: 700, marginBottom: 10 }}>Commissioner controls</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 8 }}>
+          <span style={{ fontSize: 11.5, color: C.mute }}>{results.revealed ? "Picks visible in League Picks tab." : "Picks hidden from players."}</span>
+          <button onClick={() => { if (confirmReveal) { onToggleReveal(); setConfirmReveal(false); } else { setConfirmReveal(true); setTimeout(() => setConfirmReveal(false), 4000); } }} style={{ background: "transparent", color: C.mute, border: `1px solid ${C.line}`, borderRadius: 2, padding: "5px 10px", fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>{results.revealed ? (confirmReveal ? "Confirm hide" : "Hide picks") : (confirmReveal ? "Confirm reveal" : "Reveal picks")}</button>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 11.5, color: C.mute }}>{results.editingOpen ? "Editing is open for all players." : "Picks locked (deadline passed)."}</span>
+          <button onClick={onToggleEditing} style={{ background: "transparent", color: C.mute, border: `1px solid ${C.line}`, borderRadius: 2, padding: "5px 10px", fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>{results.editingOpen ? "Close editing" : "Open editing"}</button>
+        </div>
+      </div>
     </div>
   );
 }
