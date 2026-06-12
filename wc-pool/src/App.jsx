@@ -498,7 +498,7 @@ export default function App() {
       <Header tab={tab} setTab={setTab} pastDeadline={pastDeadline} deadline={deadline} now={now} feedStatus={feedStatus} feedAt={results.feedAt} onReset={handleReset} confirmReset={confirmReset} editingOpen={!!results.editingOpen} />
       {toast && <div style={{ position: "sticky", top: 0, zIndex: 5, background: C.ink, color: C.chalk, padding: "8px 14px", fontSize: 13, fontWeight: 600 }}>{toast}</div>}
       {tab === "play" && (!playerId
-        ? <Join nameInput={nameInput} setNameInput={setNameInput} onJoin={joinAs} players={players} announcements={results.announcements || []} />
+        ? <Join nameInput={nameInput} setNameInput={setNameInput} onJoin={joinAs} players={players} announcements={results.announcements || []} pastDeadline={pastDeadline} />
         : <PlayTab playerName={playerName} picks={picks} editable={editable} locked={locked} pastDeadline={pastDeadline} setScorePick={setScorePick} toggleAdvance={toggleAdvance} onSave={() => savePicks({ lock: false })} onLock={() => savePicks({ lock: true })} onUnlock={unlockPicks} onSwitch={() => { setPlayerId(null); setNameInput(""); }} />)}
       {tab === "tables" && <Tables qual={qual} />}
       {tab === "standings" && <Standings rows={standRows} autoReady={qual.allComplete} />}
@@ -562,7 +562,7 @@ function Footer() {
   );
 }
 
-function Join({ nameInput, setNameInput, onJoin, players, announcements }) {
+function Join({ nameInput, setNameInput, onJoin, players, announcements, pastDeadline }) {
   const playerNames = Object.values(players || {});
   return (
     <div style={{ padding: "26px 18px" }}>
@@ -579,31 +579,47 @@ function Join({ nameInput, setNameInput, onJoin, players, announcements }) {
           </div>
         </div>
       )}
-      <Eyebrow>Enter the pool</Eyebrow>
 
-      <div style={{ display: "flex", gap: 8, margin: "16px 0" }}>
-        <input value={nameInput} onChange={(e) => setNameInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && onJoin(nameInput)} placeholder="Your name" style={{ flex: 1, padding: "12px", border: `1.5px solid ${C.ink}`, borderRadius: 2, fontSize: 15, fontFamily: "inherit" }} />
-        <button onClick={() => onJoin(nameInput)} style={{ background: C.ink, color: C.chalk, border: "none", borderRadius: 2, padding: "0 18px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Start</button>
-      </div>
-
-      <div style={{ background: "#FBF1DA", border: `1.5px solid ${C.sun}`, borderRadius: 4, padding: "14px 16px", marginBottom: 20, lineHeight: 1.6 }}>
-        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>How this works</div>
-        <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: C.ink }}>
-          <li><strong>New player?</strong> Type any name and hit Start.</li>
-          <li><strong>Returning?</strong> Type the <strong>exact same name</strong> you used before to get back to your picks.</li>
-          <li>This is on the <strong>honor system</strong> — there are no passwords. Please only type your own name. If you type someone else's name you'll be able to see and edit their picks.</li>
-        </ul>
-      </div>
-
-      {playerNames.length > 0 && (
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>Players in the pool ({playerNames.length})</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 6 }}>
-            {playerNames.map((name) => (
-              <div key={name} style={{ background: C.chalk, border: `1px solid ${C.line}`, borderRadius: 3, padding: "8px 12px", fontSize: 13, fontWeight: 600 }}>{name}</div>
-            ))}
+      {pastDeadline ? (
+        <>
+          <Eyebrow>Welcome back</Eyebrow>
+          <p style={{ fontSize: 14, color: C.mute, margin: "8px 0 16px", lineHeight: 1.5 }}>Tap your name below to view your picks, check standings, and follow the tournament.</p>
+          {playerNames.length > 0 && (
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 8 }}>
+                {playerNames.map((name) => (
+                  <button key={name} onClick={() => onJoin(name)} style={{ background: C.chalk, border: `1.5px solid ${C.ink}`, borderRadius: 3, padding: "12px 14px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>{name}</button>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <Eyebrow>Enter the pool</Eyebrow>
+          <div style={{ display: "flex", gap: 8, margin: "16px 0" }}>
+            <input value={nameInput} onChange={(e) => setNameInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && onJoin(nameInput)} placeholder="Your name" style={{ flex: 1, padding: "12px", border: `1.5px solid ${C.ink}`, borderRadius: 2, fontSize: 15, fontFamily: "inherit" }} />
+            <button onClick={() => onJoin(nameInput)} style={{ background: C.ink, color: C.chalk, border: "none", borderRadius: 2, padding: "0 18px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Start</button>
           </div>
-        </div>
+          <div style={{ background: "#FBF1DA", border: `1.5px solid ${C.sun}`, borderRadius: 4, padding: "14px 16px", marginBottom: 20, lineHeight: 1.6 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>How this works</div>
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: C.ink }}>
+              <li><strong>New player?</strong> Type any name and hit Start.</li>
+              <li><strong>Returning?</strong> Type the <strong>exact same name</strong> you used before to get back to your picks.</li>
+              <li>This is on the <strong>honor system</strong> — there are no passwords. Please only type your own name. If you type someone else's name you'll be able to see and edit their picks.</li>
+            </ul>
+          </div>
+          {playerNames.length > 0 && (
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>Players in the pool ({playerNames.length})</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 6 }}>
+                {playerNames.map((name) => (
+                  <div key={name} style={{ background: C.chalk, border: `1px solid ${C.line}`, borderRadius: 3, padding: "8px 12px", fontSize: 13, fontWeight: 600 }}>{name}</div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       <div style={{ background: C.ink, color: C.chalk, borderRadius: 4, padding: "16px 18px", marginBottom: 8 }}>
