@@ -582,17 +582,20 @@ function Join({ nameInput, setNameInput, onJoin, players, announcements, pastDea
 
       {pastDeadline ? (
         <>
-          <Eyebrow>Welcome back</Eyebrow>
-          <p style={{ fontSize: 14, color: C.mute, margin: "8px 0 16px", lineHeight: 1.5 }}>Tap your name below to view your picks, check standings, and follow the tournament.</p>
+          <h2 style={{ fontFamily: "Anton, sans-serif", fontWeight: 400, fontSize: 32, lineHeight: 1, margin: "8px 0 6px" }}>WELCOME BACK</h2>
+          <p style={{ fontSize: 15, color: C.ink, margin: "0 0 18px", lineHeight: 1.5, fontWeight: 600 }}>👇 Tap your name below to get back into the game — view your picks, check standings, and follow the tournament.</p>
           {playerNames.length > 0 && (
-            <div style={{ marginBottom: 24 }}>
+            <div style={{ marginBottom: 20 }}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 8 }}>
                 {playerNames.map((name) => (
-                  <button key={name} onClick={() => onJoin(name)} style={{ background: C.chalk, border: `1.5px solid ${C.ink}`, borderRadius: 3, padding: "12px 14px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>{name}</button>
+                  <button key={name} onClick={() => onJoin(name)} style={{ background: C.ink, border: `1.5px solid ${C.ink}`, color: C.chalk, borderRadius: 3, padding: "14px", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>{name}</button>
                 ))}
               </div>
             </div>
           )}
+          <div style={{ background: "#FBF1DA", border: `1.5px solid ${C.sun}`, borderRadius: 4, padding: "14px 16px", marginBottom: 20, lineHeight: 1.6, fontSize: 13, color: C.ink }}>
+            This is on the <strong>honor system</strong> — there are no passwords. Please only tap your own name. If you tap someone else's name you'll be able to see and edit their picks.
+          </div>
         </>
       ) : (
         <>
