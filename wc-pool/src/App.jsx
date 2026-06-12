@@ -897,8 +897,9 @@ function Results({ results, setScore, toggleResultAdvance, qual, setManualOrder,
   const [draft, setDraft] = useState({});
 
   function commit(m) {
-    const d = draft[m]; if (!d || d.hg == null || d.ag == null) return;
-    setScore(m, d.hg, d.ag);
+    const d = draft[m]; if (!d) return;
+    if (d.hg == null && d.ag == null) setScore(m, null, null);
+    else if (d.hg != null && d.ag != null) setScore(m, d.hg, d.ag);
   }
 
   return (
@@ -938,8 +939,12 @@ function Results({ results, setScore, toggleResultAdvance, qual, setManualOrder,
                       <ScoreBox value={d.hg} onChange={(v) => setDraft((p) => ({ ...p, [mm.m]: { ...d, hg: v } }))} />
                       <span style={{ color: C.mute }}>–</span>
                       <ScoreBox value={d.ag} onChange={(v) => setDraft((p) => ({ ...p, [mm.m]: { ...d, ag: v } }))} />
-                      <button onClick={() => commit(mm.m)} disabled={d.hg == null || d.ag == null}
-                        style={{ background: (d.hg == null || d.ag == null) ? C.line : C.pitch, color: C.chalk, border: "none", borderRadius: 2, padding: "8px 10px", fontWeight: 700, fontSize: 12, cursor: (d.hg == null || d.ag == null) ? "default" : "pointer", fontFamily: "inherit" }}>Save</button>
+                      {(() => { const canSave = (d.hg != null && d.ag != null); const canClear = (d.hg == null && d.ag == null && s && s.hg != null); return <>
+                        <button onClick={() => commit(mm.m)} disabled={!canSave}
+                          style={{ background: canSave ? C.pitch : C.line, color: C.chalk, border: "none", borderRadius: 2, padding: "8px 10px", fontWeight: 700, fontSize: 12, cursor: canSave ? "pointer" : "default", fontFamily: "inherit" }}>Save</button>
+                        {canClear && <button onClick={() => { setScore(mm.m, null, null); setDraft((p) => { const n = { ...p }; delete n[mm.m]; return n; }); }}
+                          style={{ background: C.red, color: C.chalk, border: "none", borderRadius: 2, padding: "8px 10px", fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Clear</button>}
+                      </>; })()}
                     </div>
                   </div>
                 );
