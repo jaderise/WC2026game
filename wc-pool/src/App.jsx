@@ -308,6 +308,7 @@ export default function App() {
   const [standRows, setStandRows] = useState([]);
   const [confirmReset, setConfirmReset] = useState(false);
   const [leagueEntries, setLeagueEntries] = useState([]);
+  const [analysisEntries, setAnalysisEntries] = useState([]);
   const [confirmReveal, setConfirmReveal] = useState(false);
 
   const now = Date.now();
@@ -476,6 +477,13 @@ export default function App() {
   }
 
   useEffect(() => { (async () => {
+    if (tab !== "analysis") return;
+    const ids = await sList(NS + "player:"); const out = [];
+    for (const key of ids) { const data = await sGet(key); if (!data) continue; out.push({ id: key, name: data.name || key, picks: data.picks || emptyPicks(), locked: !!data.locked }); }
+    setAnalysisEntries(out);
+  })(); }, [tab, results]);
+
+  useEffect(() => { (async () => {
     if (tab !== "league") return;
     const ids = await sList(NS + "player:"); const out = [];
     for (const key of ids) { const data = await sGet(key); if (!data) continue; out.push({ id: key, name: data.name || key, picks: data.picks || emptyPicks(), locked: !!data.locked }); }
@@ -503,6 +511,7 @@ export default function App() {
       {tab === "tables" && <Tables qual={qual} />}
       {tab === "standings" && <Standings rows={standRows} autoReady={qual.allComplete} />}
       {tab === "league" && <LeaguePicks entries={leagueEntries} revealed={results.revealed} />}
+      {tab === "analysis" && <Analysis entries={analysisEntries} results={results} players={players} />}
       {tab === "updates" && <Updates announcements={results.announcements || []} onPost={postAnnouncement} onDelete={deleteAnnouncement} isCommissioner={!!playerId} />}
       {tab === "results" && (playerId
         ? <Results results={results} setScore={setScore} toggleResultAdvance={toggleResultAdvance} qual={qual} setManualOrder={setManualOrder} setManualThird={setManualThird} feedStatus={feedStatus} feedAt={results.feedAt} onToggleReveal={toggleReveal} confirmReveal={confirmReveal} setConfirmReveal={setConfirmReveal} onToggleEditing={toggleEditingOpen} />
@@ -526,7 +535,7 @@ function Shell({ children }) {
 
 function Header({ tab, setTab, pastDeadline, deadline, now, feedStatus, feedAt, onReset, confirmReset, editingOpen }) {
   const days = Math.max(0, Math.ceil((deadline - now) / 86400000));
-  const tabs = [["play", "My Picks"], ["tables", "Group Tables"], ["standings", "Standings"], ["league", "League Picks"], ["updates", "Updates"], ["results", "Results"]];
+  const tabs = [["play", "My Picks"], ["tables", "Group Tables"], ["standings", "Standings"], ["league", "League Picks"], ["analysis", "Analysis"], ["updates", "Updates"], ["results", "Results"]];
   return (
     <div style={{ background: C.ink, color: C.chalk, padding: "22px 14px 0" }}>
       {SANDBOX && (
@@ -1055,6 +1064,502 @@ function Updates({ announcements, onPost, onDelete, isCommissioner }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ---------- Horizontal Bar Chart ---------- */
+function HBar({ data, maxVal, barColor, height = 28, showPct = false, total = 0 }) {
+  const max = maxVal || Math.max(...data.map((d) => d.value), 1);
+  return (
+    <div>
+      {data.map((d, i) => (
+        <div key={i} style={{ display: "flex", alignItems: "center", marginBottom: 4 }}>
+          <div style={{ width: 110, fontSize: 12.5, fontWeight: 600, textAlign: "right", paddingRight: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.label}</div>
+          <div style={{ flex: 1, position: "relative", height }}>
+            <div style={{ position: "absolute", top: 0, left: 0, height: "100%", width: `${Math.max(d.value / max * 100, 0)}%`, background: d.color || barColor || C.ink, borderRadius: 3, transition: "width .4s ease" }} />
+            <div style={{ position: "absolute", top: 0, left: 0, height: "100%", display: "flex", alignItems: "center", paddingLeft: Math.max(d.value / max * 100, 0) > 30 ? 0 : 8, paddingRight: 8, width: "100%", justifyContent: Math.max(d.value / max * 100, 0) > 30 ? "flex-start" : "flex-start" }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: Math.max(d.value / max * 100, 0) > 30 ? C.chalk : C.ink, marginLeft: Math.max(d.value / max * 100, 0) > 30 ? 8 : `calc(${Math.max(d.value / max * 100, 0)}% + 6px)`, position: "absolute" }}>
+                {d.value}{showPct && total ? ` (${Math.round(100 * d.value / total)}%)` : ""}
+              </span>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ---------- Dot Matrix for match outcomes ---------- */
+function DotRow({ label, outcomes, playerNames, total }) {
+  const order = { H: 0, D: 1, A: 2 };
+  const sorted = [...outcomes].sort((a, b) => order[a.outcome] - order[b.outcome]);
+  const colors = { H: C.pitch, D: C.sun, A: C.red };
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{label}</div>
+      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+        {sorted.map((o, i) => (
+          <div key={i} title={`${o.name}: ${o.score}`} style={{ width: 24, height: 24, borderRadius: 3, background: colors[o.outcome] || C.mute, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 700, color: C.chalk, cursor: "default" }}>
+            {o.initials}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Analysis Blog Component ---------- */
+function Analysis({ entries, results, players }) {
+  const playerIds = Object.keys(players || {});
+  const n = playerIds.length;
+  if (n === 0) return <div style={{ padding: "30px 18px", color: C.mute }}>No player data available yet.</div>;
+
+  const playerPicks = {};
+  for (const e of entries) {
+    const id = e.id.replace(NS + "player:", "").replace(`${NS.replace(":", "__")}player__`, "");
+    playerPicks[e.name] = e.picks || emptyPicks();
+  }
+  const names = Object.keys(playerPicks);
+  if (names.length === 0) return <div style={{ padding: "30px 18px", color: C.mute }}>Loading analysis data…</div>;
+
+  const actualScores = results.scores || {};
+  const playedMatches = MATCHES.filter((mm) => actualScores[mm.m] && actualScores[mm.m].hg != null);
+  const firstRoundMatches = MATCHES.filter((mm) => mm.m >= 1 && mm.m <= 24);
+  const firstRoundPlayed = firstRoundMatches.filter((mm) => actualScores[mm.m] && actualScores[mm.m].hg != null);
+
+  // Champion data
+  const champPicks = {};
+  const champByTeam = {};
+  for (const name of names) {
+    const champ = (playerPicks[name].advanced?.champ || [])[0] || null;
+    champPicks[name] = champ;
+    if (champ) champByTeam[champ] = [...(champByTeam[champ] || []), name];
+  }
+  const champSorted = Object.entries(champByTeam).sort((a, b) => b[1].length - a[1].length);
+  const noChamp = names.filter((n) => !champPicks[n]);
+
+  // Semi data
+  const sfByTeam = {};
+  for (const name of names) {
+    const sfs = playerPicks[name].advanced?.sf || [];
+    for (const t of sfs) sfByTeam[t] = [...(sfByTeam[t] || []), name];
+  }
+  const sfSorted = Object.entries(sfByTeam).sort((a, b) => b[1].length - a[1].length);
+
+  // Finalist data
+  const finalByTeam = {};
+  for (const name of names) {
+    const finals = playerPicks[name].advanced?.final || [];
+    for (const t of finals) finalByTeam[t] = [...(finalByTeam[t] || []), name];
+  }
+
+  // First round match outcomes
+  const firstRoundData = firstRoundPlayed.map((mm) => {
+    const actual = actualScores[mm.m];
+    const actualOutcome = predOutcome(actual);
+    const preds = [];
+    let correct = 0;
+    const exactMatches = [];
+    for (const name of names) {
+      const s = (playerPicks[name].scores || {})[mm.m];
+      const o = predOutcome(s);
+      if (o) preds.push({ name, outcome: o, score: s ? `${s.hg}-${s.ag}` : "?", initials: name.slice(0, 2).toUpperCase() });
+      if (o && o === actualOutcome) { correct++; if (s && s.hg === actual.hg && s.ag === actual.ag) exactMatches.push(name); }
+    }
+    return { mm, actual, actualOutcome, preds, correct, exactMatches, total: preds.length };
+  });
+
+  const shockers = firstRoundData.filter((d) => d.correct <= Math.ceil(d.total * 0.15));
+  const nailed = firstRoundData.filter((d) => d.correct >= Math.ceil(d.total * 0.85));
+
+  // Accuracy
+  const accuracy = names.map((name) => {
+    let c = 0;
+    for (const mm of firstRoundPlayed) {
+      const s = (playerPicks[name].scores || {})[mm.m];
+      if (predOutcome(s) === predOutcome(actualScores[mm.m])) c++;
+    }
+    return { name, correct: c, pct: firstRoundPlayed.length ? Math.round(100 * c / firstRoundPlayed.length) : 0 };
+  }).sort((a, b) => b.correct - a.correct);
+
+  const cardStyle = { background: C.chalk, borderRadius: 8, padding: "20px 18px", marginBottom: 20, border: `1px solid ${C.line}` };
+  const h2Style = { fontFamily: "Anton, sans-serif", fontWeight: 400, fontSize: 26, margin: "0 0 4px", lineHeight: 1.1 };
+  const h3Style = { fontFamily: "Anton, sans-serif", fontWeight: 400, fontSize: 20, margin: "16px 0 8px", lineHeight: 1.1 };
+  const pStyle = { fontSize: 13.5, lineHeight: 1.6, margin: "8px 0", color: C.ink };
+  const tagStyle = (bg) => ({ display: "inline-block", background: bg, color: C.chalk, borderRadius: 3, padding: "2px 8px", fontSize: 11, fontWeight: 700, marginRight: 6 });
+
+  return (
+    <div style={{ padding: "20px 14px" }}>
+      <Eyebrow>Pool Analytics</Eyebrow>
+      <h1 style={{ fontFamily: "Anton, sans-serif", fontWeight: 400, fontSize: 36, lineHeight: 1, margin: "6px 0 4px" }}>THE BREAKDOWN</h1>
+      <p style={{ fontSize: 12, color: C.mute, margin: "0 0 24px", fontFamily: "'DM Mono', monospace" }}>Analysis by Claude · Updated as the tournament unfolds</p>
+
+      {/* ===== POST 1: Opening Matchday Report ===== */}
+      <div style={cardStyle}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+          <span style={tagStyle(C.ink)}>MATCHDAY 1-2</span>
+          <span style={tagStyle(C.sun)}>GROUP STAGE</span>
+        </div>
+        <h2 style={h2Style}>THE CRYSTAL BALL IS CRACKED</h2>
+        <p style={{ fontSize: 12, color: C.mute, fontFamily: "'DM Mono', monospace", margin: "4px 0 14px" }}>First round results vs. {names.length} sets of predictions</p>
+
+        <p style={pStyle}>
+          {firstRoundPlayed.length} of the first 24 group matches are in the books, and the pool's collective crystal ball has already taken a beating.
+          {shockers.length > 0 && ` ${shockers.length} result${shockers.length > 1 ? "s" : ""} caught almost everyone off guard.`}
+          {nailed.length > 0 && ` Meanwhile, ${nailed.length} match${nailed.length > 1 ? "es were" : " was"} so predictable the pool basically called ${nailed.length > 1 ? "them" : "it"} unanimously.`}
+        </p>
+
+        {/* Shockers */}
+        {shockers.length > 0 && (<>
+          <h3 style={h3Style}>NOBODY SAW THAT COMING</h3>
+          <p style={pStyle}>
+            These results left the pool speechless. Out of {names.length} predictions, almost nobody got the right outcome.
+          </p>
+          {shockers.map((d) => (
+            <div key={d.mm.m} style={{ background: C.paper, borderRadius: 6, padding: "12px 14px", marginBottom: 8, borderLeft: `4px solid ${C.red}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <span style={{ fontWeight: 700, fontSize: 14 }}>{d.mm.h} {d.actual.hg} – {d.actual.ag} {d.mm.a}</span>
+                  <span style={{ fontSize: 12, color: C.mute, marginLeft: 8 }}>M{d.mm.m} · {d.mm.d}</span>
+                </div>
+                <span style={tagStyle(C.red)}>{d.correct}/{d.total} correct</span>
+              </div>
+              {d.correct > 0 && <div style={{ fontSize: 12, color: C.pitch, fontWeight: 600, marginTop: 4 }}>Called it: {d.preds.filter((p) => p.outcome === d.actualOutcome).map((p) => p.name).join(", ")}</div>}
+              {d.exactMatches.length > 0 && <div style={{ fontSize: 12, color: C.sun, fontWeight: 700, marginTop: 2 }}>Exact score: {d.exactMatches.join(", ")}</div>}
+            </div>
+          ))}
+        </>)}
+
+        {/* Nailed it */}
+        {nailed.length > 0 && (<>
+          <h3 style={h3Style}>THE SURE THINGS</h3>
+          <p style={pStyle}>
+            Some matches played out exactly as the crowd expected. These were the gimmes — almost everyone got them right.
+          </p>
+          {nailed.map((d) => (
+            <div key={d.mm.m} style={{ background: C.paper, borderRadius: 6, padding: "12px 14px", marginBottom: 8, borderLeft: `4px solid ${C.pitch}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <span style={{ fontWeight: 700, fontSize: 14 }}>{d.mm.h} {d.actual.hg} – {d.actual.ag} {d.mm.a}</span>
+                  <span style={{ fontSize: 12, color: C.mute, marginLeft: 8 }}>M{d.mm.m} · {d.mm.d}</span>
+                </div>
+                <span style={tagStyle(C.pitch)}>{d.correct}/{d.total} correct</span>
+              </div>
+              {d.exactMatches.length > 0 && <div style={{ fontSize: 12, color: C.sun, fontWeight: 700, marginTop: 4 }}>Nailed the exact score: {d.exactMatches.join(", ")}</div>}
+            </div>
+          ))}
+        </>)}
+
+        {/* Match-by-match dot chart */}
+        <h3 style={h3Style}>MATCH BY MATCH — WHO GOT IT RIGHT?</h3>
+        <p style={pStyle}>
+          Each square is a player. <span style={{ color: C.pitch, fontWeight: 700 }}>Green</span> = picked the home team, <span style={{ color: C.sun, fontWeight: 700 }}>Gold</span> = picked a draw, <span style={{ color: C.red, fontWeight: 700 }}>Red</span> = picked the away team. Hover for details.
+        </p>
+        {firstRoundData.map((d) => {
+          const outLabel = d.actualOutcome === "H" ? "Home win" : d.actualOutcome === "A" ? "Away win" : "Draw";
+          const outColor = d.actualOutcome === "H" ? C.pitch : d.actualOutcome === "A" ? C.red : C.sun;
+          return (
+            <div key={d.mm.m} style={{ marginBottom: 10, padding: "8px 0", borderBottom: `1px solid ${C.line}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                <span style={{ fontSize: 13, fontWeight: 700 }}>M{d.mm.m} {d.mm.h} {d.actual.hg}–{d.actual.ag} {d.mm.a}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: outColor }}>{outLabel} · {d.correct}/{d.total}</span>
+              </div>
+              <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
+                {d.preds.map((p, i) => {
+                  const isCorrect = p.outcome === d.actualOutcome;
+                  const bg = p.outcome === "H" ? C.pitch : p.outcome === "A" ? C.red : C.sun;
+                  return (
+                    <div key={i} title={`${p.name}: ${p.score}${isCorrect ? " ✓" : ""}`}
+                      style={{ width: 26, height: 26, borderRadius: 3, background: bg, display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 8, fontWeight: 700, color: C.chalk, cursor: "default", opacity: isCorrect ? 1 : 0.35,
+                        border: isCorrect ? `2px solid ${C.ink}` : "none" }}>
+                      {p.initials}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Early accuracy */}
+        {firstRoundPlayed.length > 0 && (<>
+          <h3 style={h3Style}>EARLY ACCURACY LEADERBOARD</h3>
+          <p style={pStyle}>
+            Who's reading the tournament best so far? Correct outcome picks out of {firstRoundPlayed.length} first-round matches.
+          </p>
+          <HBar
+            data={accuracy.map((a) => ({ label: a.name, value: a.correct, color: a.correct >= accuracy[0].correct ? C.pitch : a.correct >= accuracy[Math.floor(accuracy.length / 2)].correct ? C.ink : C.mute }))}
+            maxVal={firstRoundPlayed.length}
+            height={22}
+          />
+        </>)}
+      </div>
+
+      {/* ===== POST 2: Champion & Knockout Vision ===== */}
+      <div style={cardStyle}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+          <span style={tagStyle(C.ink)}>PRE-TOURNAMENT</span>
+          <span style={tagStyle(C.pitch)}>KNOCKOUT PICKS</span>
+        </div>
+        <h2 style={h2Style}>WHERE THE POOL AGREES — AND DOESN'T</h2>
+        <p style={{ fontSize: 12, color: C.mute, fontFamily: "'DM Mono', monospace", margin: "4px 0 14px" }}>Champion and semifinal picks across {names.length} players</p>
+
+        <h3 style={h3Style}>THE CHAMPION QUESTION</h3>
+        <p style={pStyle}>
+          {champSorted.length > 0 && champSorted[0][1].length >= 5
+            ? `${champSorted[0][0]} is the runaway favourite, backed by ${champSorted[0][1].length} of ${names.length} players (${Math.round(100 * champSorted[0][1].length / names.length)}%). `
+            : "No team dominates the champion picks — the pool is split. "}
+          {champSorted.length > 1 && `${champSorted[1][0]} comes in second with ${champSorted[1][1].length} pick${champSorted[1][1].length > 1 ? "s" : ""}.`}
+          {noChamp.length > 0 && ` ${noChamp.length} player${noChamp.length > 1 ? "s" : ""} didn't commit to a champion pick (living dangerously).`}
+          {champSorted.length > 0 && champSorted[champSorted.length - 1][1].length === 1 &&
+            ` ${champSorted[champSorted.length - 1][1][0]} is riding solo with ${champSorted[champSorted.length - 1][0]} — bold move.`}
+        </p>
+
+        <HBar
+          data={champSorted.map(([team, pickers]) => ({
+            label: team,
+            value: pickers.length,
+            color: pickers.length >= 5 ? C.pitch : pickers.length >= 3 ? C.ink : C.mute
+          }))}
+          maxVal={names.length}
+          showPct={true}
+          total={names.length}
+          height={30}
+        />
+        <div style={{ marginTop: 8 }}>
+          {champSorted.map(([team, pickers]) => (
+            <div key={team} style={{ fontSize: 12, color: C.mute, marginBottom: 2 }}>
+              <span style={{ fontWeight: 700, color: C.ink }}>{team}:</span> {pickers.join(", ")}
+            </div>
+          ))}
+          {noChamp.length > 0 && <div style={{ fontSize: 12, color: C.mute }}><span style={{ fontWeight: 700, color: C.red }}>No pick:</span> {noChamp.join(", ")}</div>}
+        </div>
+
+        <h3 style={h3Style}>THE FINAL FOUR — SEMIFINAL PICKS</h3>
+        <p style={pStyle}>
+          This is where consensus meets chaos. Each player picked 4 teams they think will make the semifinals.
+          {sfSorted.length > 0 && ` ${sfSorted[0][0]} leads the pack, appearing in ${sfSorted[0][1].length} of ${names.length} brackets (${Math.round(100 * sfSorted[0][1].length / names.length)}%).`}
+          {sfSorted.length > 1 && sfSorted[1][1].length === sfSorted[0][1].length && ` ${sfSorted[1][0]} is right there too at ${sfSorted[1][1].length}.`}
+          {sfSorted.filter((s) => s[1].length === 1).length > 0 && ` ${sfSorted.filter((s) => s[1].length === 1).length} team${sfSorted.filter((s) => s[1].length === 1).length > 1 ? "s have" : " has"} just a single believer — that's either genius or delusion.`}
+        </p>
+
+        <HBar
+          data={sfSorted.map(([team, pickers]) => ({
+            label: team,
+            value: pickers.length,
+            color: pickers.length >= Math.ceil(names.length * 0.5) ? C.pitch : pickers.length >= Math.ceil(names.length * 0.2) ? C.sun : pickers.length >= 2 ? C.ink : C.mute
+          }))}
+          maxVal={names.length}
+          showPct={true}
+          total={names.length}
+          height={24}
+        />
+        <div style={{ marginTop: 8 }}>
+          {sfSorted.map(([team, pickers]) => (
+            <div key={team} style={{ fontSize: 12, color: C.mute, marginBottom: 2 }}>
+              <span style={{ fontWeight: 700, color: C.ink }}>{team}:</span> {pickers.join(", ")}
+            </div>
+          ))}
+        </div>
+
+        {/* The hive mind vs. the mavericks */}
+        <h3 style={h3Style}>THE HIVE MIND vs. THE MAVERICKS</h3>
+        <p style={pStyle}>
+          How much do people's knockout brackets overlap? We compared every pair of semifinal picks.
+        </p>
+        {(() => {
+          const overlaps = [];
+          for (let i = 0; i < names.length; i++) {
+            const a = new Set(playerPicks[names[i]].advanced?.sf || []);
+            let totalOverlap = 0, comparisons = 0;
+            for (let j = 0; j < names.length; j++) {
+              if (i === j) continue;
+              const b = new Set(playerPicks[names[j]].advanced?.sf || []);
+              let shared = 0;
+              for (const t of a) if (b.has(t)) shared++;
+              totalOverlap += shared;
+              comparisons++;
+            }
+            if (a.size > 0) overlaps.push({ name: names[i], avg: comparisons ? totalOverlap / comparisons : 0 });
+          }
+          overlaps.sort((a, b) => b.avg - a.avg);
+          const hiveMind = overlaps.slice(0, 3);
+          const mavericks = overlaps.slice(-3).reverse();
+          return (<>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 8 }}>
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6, color: C.pitch }}>Most mainstream brackets</div>
+                {hiveMind.map((o) => (
+                  <div key={o.name} style={{ fontSize: 13, marginBottom: 2 }}>{o.name} — {o.avg.toFixed(1)} avg shared picks</div>
+                ))}
+              </div>
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6, color: C.red }}>Most contrarian brackets</div>
+                {mavericks.map((o) => (
+                  <div key={o.name} style={{ fontSize: 13, marginBottom: 2 }}>{o.name} — {o.avg.toFixed(1)} avg shared picks</div>
+                ))}
+              </div>
+            </div>
+          </>);
+        })()}
+
+        {/* Unique knockout combos */}
+        <h3 style={h3Style}>FINAL MATCHUP PICKS</h3>
+        <p style={pStyle}>
+          Every player's predicted final. The two teams they think will play for the trophy.
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8, marginTop: 8 }}>
+          {names.filter((n) => (playerPicks[n].advanced?.final || []).length >= 2).map((name) => {
+            const f = playerPicks[name].advanced?.final || [];
+            return (
+              <div key={name} style={{ background: C.paper, borderRadius: 6, padding: "10px 14px", border: `1px solid ${C.line}` }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: C.mute, marginBottom: 4 }}>{name}</div>
+                <div style={{ fontSize: 15, fontWeight: 700 }}>{f[0]} <span style={{ color: C.sun }}>vs</span> {f[1]}</div>
+                <div style={{ fontSize: 11, color: C.pitch, fontWeight: 600, marginTop: 2 }}>Winner: {champPicks[name] || "?"}</div>
+              </div>
+            );
+          })}
+          {names.filter((n) => (playerPicks[n].advanced?.final || []).length < 2).map((name) => (
+            <div key={name} style={{ background: C.paper, borderRadius: 6, padding: "10px 14px", border: `1px dashed ${C.line}`, opacity: 0.6 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.mute }}>{name}</div>
+              <div style={{ fontSize: 13, color: C.mute, fontStyle: "italic" }}>No final pick</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ===== POST 3: Group Stage Consensus ===== */}
+      <div style={cardStyle}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+          <span style={tagStyle(C.ink)}>PRE-TOURNAMENT</span>
+          <span style={tagStyle(C.sun)}>GROUP STAGE</span>
+        </div>
+        <h2 style={h2Style}>THE SCORES WE ALL AGREED ON (AND THE ONES WE DIDN'T)</h2>
+        <p style={{ fontSize: 12, color: C.mute, fontFamily: "'DM Mono', monospace", margin: "4px 0 14px" }}>Round 1 group match consensus</p>
+
+        <p style={pStyle}>
+          Before a ball was kicked, our {names.length} predictors locked in their scores for all 72 group matches.
+          For the first round of 24 games, some results were near-unanimous while others split the room.
+        </p>
+
+        {(() => {
+          const consensus = firstRoundMatches.map((mm) => {
+            const outcomes = { H: 0, D: 0, A: 0 };
+            const exactScores = {};
+            for (const name of names) {
+              const s = (playerPicks[name].scores || {})[mm.m];
+              const o = predOutcome(s);
+              if (o) outcomes[o]++;
+              if (s && s.hg != null && s.ag != null) {
+                const key = `${s.hg}-${s.ag}`;
+                exactScores[key] = (exactScores[key] || 0) + 1;
+              }
+            }
+            const total = outcomes.H + outcomes.D + outcomes.A;
+            const maxEntry = Object.entries(outcomes).sort((a, b) => b[1] - a[1])[0];
+            const topScore = Object.entries(exactScores).sort((a, b) => b[1] - a[1])[0];
+            const consensusPct = total > 0 ? Math.round(100 * maxEntry[1] / total) : 0;
+            return { mm, outcomes, total, maxEntry, topScore, consensusPct };
+          });
+
+          const unanimous = consensus.filter((c) => c.consensusPct === 100).sort((a, b) => b.total - a.total);
+          const divided = consensus.filter((c) => c.consensusPct < 60).sort((a, b) => a.consensusPct - b.consensusPct);
+
+          return (<>
+            {unanimous.length > 0 && (<>
+              <h3 style={h3Style}>100% AGREEMENT</h3>
+              <p style={pStyle}>Every single player predicted the same outcome for these matches. Zero debate.</p>
+              {unanimous.map((c) => {
+                const label = c.maxEntry[0] === "H" ? `${c.mm.h} win` : c.maxEntry[0] === "A" ? `${c.mm.a} win` : "Draw";
+                const actual = actualScores[c.mm.m];
+                const gotItRight = actual && predOutcome(actual) === c.maxEntry[0];
+                const gotItWrong = actual && predOutcome(actual) !== c.maxEntry[0];
+                return (
+                  <div key={c.mm.m} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: `1px solid ${C.line}` }}>
+                    <div style={{ width: 36, height: 36, borderRadius: "50%", background: gotItRight ? C.pitch : gotItWrong ? C.red : C.ink, display: "flex", alignItems: "center", justifyContent: "center", color: C.chalk, fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                      {gotItRight ? "✓" : gotItWrong ? "✗" : "M" + c.mm.m}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 700 }}>{c.mm.h} vs {c.mm.a}</div>
+                      <div style={{ fontSize: 12, color: C.mute }}>All {c.total} picked: {label}{c.topScore ? ` · Most common score: ${c.topScore[0]} (${c.topScore[1]}×)` : ""}</div>
+                      {actual && <div style={{ fontSize: 12, fontWeight: 600, color: gotItRight ? C.pitch : C.red }}>Result: {actual.hg}–{actual.ag} {gotItRight ? "— the pool was right!" : "— surprise!"}</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </>)}
+
+            {divided.length > 0 && (<>
+              <h3 style={h3Style}>THE TOSS-UPS</h3>
+              <p style={pStyle}>These matches genuinely split opinion. No clear favourite emerged from the group.</p>
+              {divided.map((c) => {
+                const actual = actualScores[c.mm.m];
+                return (
+                  <div key={c.mm.m} style={{ padding: "10px 0", borderBottom: `1px solid ${C.line}` }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 6 }}>{c.mm.h} vs {c.mm.a} <span style={{ fontSize: 12, color: C.mute, fontWeight: 400 }}>M{c.mm.m}</span></div>
+                    <div style={{ display: "flex", gap: 4, height: 28, borderRadius: 4, overflow: "hidden" }}>
+                      {c.outcomes.H > 0 && <div style={{ flex: c.outcomes.H, background: C.pitch, display: "flex", alignItems: "center", justifyContent: "center", color: C.chalk, fontSize: 11, fontWeight: 700 }}>{c.mm.h.split(" ")[0]} {c.outcomes.H}</div>}
+                      {c.outcomes.D > 0 && <div style={{ flex: c.outcomes.D, background: C.sun, display: "flex", alignItems: "center", justifyContent: "center", color: C.chalk, fontSize: 11, fontWeight: 700 }}>Draw {c.outcomes.D}</div>}
+                      {c.outcomes.A > 0 && <div style={{ flex: c.outcomes.A, background: C.red, display: "flex", alignItems: "center", justifyContent: "center", color: C.chalk, fontSize: 11, fontWeight: 700 }}>{c.mm.a.split(" ")[0]} {c.outcomes.A}</div>}
+                    </div>
+                    {actual && <div style={{ fontSize: 12, fontWeight: 600, marginTop: 4, color: C.mute }}>Result: {actual.hg}–{actual.ag}</div>}
+                  </div>
+                );
+              })}
+            </>)}
+          </>);
+        })()}
+
+        {/* Lone wolves */}
+        <h3 style={h3Style}>LONE WOLF PICKS</h3>
+        <p style={pStyle}>
+          These brave souls were the only person in the entire pool to pick a particular outcome in a first-round match.
+          Being a lone wolf is either prophetic or painful — there is no middle ground.
+        </p>
+        {(() => {
+          const loneWolves = [];
+          for (const mm of firstRoundMatches) {
+            for (const name of names) {
+              const s = (playerPicks[name].scores || {})[mm.m];
+              const o = predOutcome(s);
+              if (!o) continue;
+              let othersWithSame = 0;
+              for (const other of names) {
+                if (other === name) continue;
+                const os = (playerPicks[other].scores || {})[mm.m];
+                if (predOutcome(os) === o) othersWithSame++;
+              }
+              if (othersWithSame === 0) {
+                const label = o === "H" ? `${mm.h} win` : o === "A" ? `${mm.a} win` : "Draw";
+                const actual = actualScores[mm.m];
+                const wasRight = actual && predOutcome(actual) === o;
+                loneWolves.push({ name, mm, label, score: s ? `${s.hg}-${s.ag}` : "?", wasRight, hasResult: !!actual });
+              }
+            }
+          }
+          return loneWolves.length > 0 ? (
+            <div>
+              {loneWolves.map((lw, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: `1px solid ${C.line}` }}>
+                  <div style={{ width: 28, height: 28, borderRadius: "50%", background: lw.hasResult ? (lw.wasRight ? C.pitch : C.red) : C.ink, display: "flex", alignItems: "center", justifyContent: "center", color: C.chalk, fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
+                    {lw.hasResult ? (lw.wasRight ? "✓" : "✗") : "?"}
+                  </div>
+                  <div style={{ flex: 1, fontSize: 13 }}>
+                    <span style={{ fontWeight: 700 }}>{lw.name}</span> alone picked <span style={{ fontWeight: 700 }}>{lw.label}</span> in {lw.mm.h} vs {lw.mm.a} ({lw.score})
+                    {lw.hasResult && <span style={{ color: lw.wasRight ? C.pitch : C.red, fontWeight: 600 }}> — {lw.wasRight ? "genius!" : "nope"}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : <p style={pStyle}>No lone wolves in round 1 — everyone stuck with the pack.</p>;
+        })()}
+      </div>
+
+      <div style={{ textAlign: "center", padding: "20px 0 10px", fontSize: 12, color: C.mute }}>
+        More analysis coming as the tournament unfolds.
+      </div>
     </div>
   );
 }
