@@ -1,0 +1,268 @@
+# WC2026 Pool — Functional Design Document
+
+## Product Overview
+
+The WC2026 Pool is a prediction league app for the FIFA World Cup 2026. It allows a group of friends (~17 players) to compete by predicting the outcomes of all 72 group stage matches and picking which teams will advance through each knockout round. A live leaderboard tracks scores in real time as the tournament progresses.
+
+**Live URL:** https://wc2026game.web.app
+
+---
+
+## User Roles
+
+### Player
+- Enters the pool by typing (or tapping) their name
+- Predicts scores for all 72 group stage matches
+- Picks teams to advance through each knockout round (R16 through Champion)
+- Locks picks before the tournament deadline
+- Views group tables, standings, league-wide picks, and announcements
+
+### Commissioner
+- Any logged-in player can act as commissioner (honor system)
+- Enters actual match results (supplemented by auto-feed)
+- Manages tiebreakers when the app can't resolve group standings automatically
+- Controls pick visibility and editing windows
+- Posts announcements to communicate with the pool
+- Sets knockout round advancement results
+
+There is no authentication system. The app runs entirely on an honor system — players are trusted to only access their own picks.
+
+---
+
+## Feature Walkthrough
+
+### Tab 1: My Picks
+
+The primary tab where players enter and manage their predictions.
+
+**Group Stage Picks**
+- All 72 matches are organized by group (A through L), with 6 matches per group
+- For each match, the player enters a predicted home score and away score
+- A computed group table appears below each group's matches, showing how the player's predicted scores would produce standings (points, goal difference, goals for)
+- The player's predicted Round of 32 qualifiers are automatically derived from their group picks (top 2 per group + best 8 third-place teams)
+
+**Knockout Picks**
+- Players select which teams they believe will reach each round:
+  - Round of 16: 16 teams (from their auto-calculated R32)
+  - Quarterfinals: 8 teams (from their R16 picks)
+  - Semifinals: 4 teams (from their QF picks)
+  - Final: 2 teams (from their SF picks)
+  - Champion: 1 team (from their Final picks)
+- Each round cascades from the previous — removing a team from an earlier round automatically removes it from all later rounds
+
+**Save & Lock Controls**
+- "Save Progress" — saves current picks without locking
+- "Save & go to Knockouts" — saves and switches to knockout view (visible on group stage)
+- "Lock Picks" — permanently locks picks (can be unlocked by the player before deadline, or by commissioner override after deadline)
+- "Unlock" — appears when picks are locked, allowing the player to edit again
+
+**Switch Player**
+- A "Switch" button in the header lets the current player exit and return to the join screen
+
+### Tab 2: Group Tables
+
+Displays the current actual group standings computed from entered match results.
+
+- 12 groups (A–L), each showing a standard football table: Played, Won, Drawn, Lost, Goals For, Goals Against, Goal Difference, Points
+- Teams qualifying for the Round of 32 are highlighted in green (top 2 per group)
+- Third-place teams in contention for the best-8 spots are highlighted in amber
+- When all group matches are complete, the full Round of 32 field is displayed
+
+### Tab 3: Standings
+
+The live leaderboard showing all players ranked by total points.
+
+- Each row shows: rank, player name, total score, and a visual progress bar
+- Expandable breakdown shows points earned in each category: Group, R32, R16, QF, SF, Final, Champion
+- Scores update in real time via Firestore live sync — when a result is entered, all connected clients see updated standings immediately
+
+### Tab 4: League Picks
+
+Shows every player's full bracket, allowing comparison across the pool.
+
+- **Hidden by default** — the commissioner must toggle "Reveal Picks" before brackets are visible
+- When revealed, each player appears as an expandable card showing:
+  - Champion pick (highlighted)
+  - Finalist picks
+  - Full knockout bracket (R16 through Champion)
+  - All 72 group stage score predictions
+- When hidden, displays "PICKS ARE SECRET" message
+
+### Tab 5: Analysis *(Upcoming — Not Yet Deployed)*
+
+A blog-style analytics page with data visualizations and narratives about the pool's collective predictions.
+
+Posts are stacked newest-on-top. The initial release includes three posts:
+
+**Post 1: "The Crystal Ball Is Cracked" — Opening Matchday Report**
+- Highlights matches where almost nobody predicted the correct outcome ("Nobody Saw That Coming")
+- Highlights matches nearly everyone got right ("The Sure Things")
+- Match-by-match dot matrix showing each player's pick vs. the actual result
+- Early accuracy leaderboard (horizontal bar chart)
+
+**Post 2: "Where The Pool Agrees — And Doesn't" — Champion & Knockout Vision**
+- Champion pick distribution (horizontal bar chart with player names)
+- Semifinal team popularity chart
+- "Hive Mind vs. Mavericks" — who has the most/least mainstream bracket
+- Final matchup grid showing each player's predicted final and winner
+
+**Post 3: "The Scores We All Agreed On (And The Ones We Didn't)" — Group Stage Consensus**
+- Matches with 100% agreement on outcome (with check/cross showing if reality matched)
+- Most divided matches (proportional split bars showing home/draw/away distribution)
+- "Lone Wolf Picks" — players who were the only person to pick a particular outcome
+
+Analysis by Claude is credited on the page.
+
+### Tab 6: Updates
+
+A simple announcements board for commissioner-to-player communication.
+
+- Commissioner can type and post messages
+- Messages appear in reverse chronological order (newest first)
+- Commissioner can delete individual messages
+- Messages also appear on the Join/welcome screen so returning players see them immediately
+
+### Tab 7: Results
+
+The commissioner's scoring and tournament management interface. Only accessible after entering a name on the My Picks tab.
+
+**Score Entry**
+- All 72 group matches listed with input fields for home/away scores
+- Scores can be entered manually or arrive via auto-feed
+- A "Clear" button appears when a score is deleted, allowing removal of incorrect entries
+- Each score records who entered it and when
+
+**Tiebreaker Resolution**
+- When group teams are tied on points, goal difference, and goals for, the app prompts the commissioner to manually set the ordering
+- Similarly for third-place teams competing for the final Round of 32 spots
+
+**Knockout Advancement**
+- Commissioner selects which teams actually advanced to each knockout round
+- Rounds available: R16, QF, SF, Final, Champion
+
+**Commissioner Controls** (located at the bottom of the Results tab)
+- **Open/Close Editing** — temporarily allows all players to modify their picks after the deadline (used for corrections)
+- **Reveal/Hide Picks** — toggles whether the League Picks tab shows everyone's brackets
+
+---
+
+## Join Flow
+
+### Before Deadline (Pre-Tournament)
+1. Player sees the welcome screen with scoring rules and any commissioner announcements
+2. Player types their name into a text input and taps "Start"
+3. If the name matches an existing player, their saved picks are loaded
+4. If new, the player starts with a blank prediction sheet
+5. Player is taken to the My Picks tab
+
+### After Deadline (Tournament In Progress)
+1. Player sees a "WELCOME BACK" header with large, clear instructions
+2. All existing player names are displayed as tappable buttons in a dark grid
+3. Player taps their own name to re-enter (honor system notice displayed)
+4. The text input for new names is removed — no new players can join after deadline
+5. Picks are view-only unless the commissioner has opened editing
+
+---
+
+## Scoring System
+
+The scoring system uses a Fibonacci-inspired point scale that rewards deeper knockout predictions more heavily.
+
+### Group Stage (72 matches)
+- **1 point** per correct match outcome (home win, draw, or away win)
+- The exact score does not matter — only the outcome counts
+- Maximum possible: 72 points
+
+### Knockout Rounds
+Players name which teams they think will reach each round. Points are awarded per team that actually reaches that round, regardless of how:
+
+| Round | Teams to Pick | Points per Correct Team | Max Points |
+|-------|--------------|------------------------|------------|
+| Round of 32 | 32 | 2 | 64 |
+| Round of 16 | 16 | 3 | 48 |
+| Quarterfinals | 8 | 5 | 40 |
+| Semifinals | 4 | 8 | 32 |
+| Final | 2 | 13 | 26 |
+| Champion | 1 | 21 | 21 |
+
+**Knockout max: 231 points. Grand total possible: 303 points.**
+
+### Round of 32 — Automatic Qualification
+The R32 is not picked directly. Instead, it's computed from each player's group stage score predictions:
+- Top 2 teams per group qualify (24 teams)
+- Best 8 third-place teams qualify (ranked by predicted points → goal difference → goals for)
+- Total: 32 teams
+
+### How "Correct" Is Determined
+- **Group matches:** Does the predicted outcome (H/D/A) match the actual outcome?
+- **Knockout rounds:** Is the team in the player's list for that round AND in the actual list for that round? The path doesn't matter — if a player picked Brazil for the semifinals and Brazil reaches the semifinals by any route, the player earns 8 points.
+
+---
+
+## Commissioner Workflow
+
+### During the Tournament
+1. **Scores arrive automatically** via the openfootball GitHub feed every 15 minutes
+2. Commissioner reviews and can manually correct or enter scores that the feed missed
+3. As group play completes, the commissioner resolves any tiebreakers the app can't determine automatically
+4. Commissioner sets knockout round results as they happen
+5. Commissioner posts announcements for notable events or rule clarifications
+
+### Emergency Overrides
+- **Open Editing:** If players missed the deadline or need corrections, the commissioner can temporarily reopen editing for all players, then close it again
+- **Reveal/Hide Picks:** Commissioner controls when everyone's brackets become visible to the group
+
+---
+
+## Auto-Feed
+
+The app automatically fetches live match scores from the openfootball project on GitHub.
+
+- **Source:** `openfootball/worldcup.json` repository on GitHub (raw JSON)
+- **Frequency:** Every 15 minutes + on app load
+- **Merge logic:** Feed scores are only applied if no manual score exists for that match. Manual entries (identified by the `by` field) are never overwritten.
+- **Team name normalization:** The feed uses different team names (e.g., "United States" vs "USA", "Côte d'Ivoire" vs "Ivory Coast"), which are mapped via an alias table
+- **Status indicator:** The header shows "auto-feed synced Xm ago" or "auto-feed offline" if the fetch fails
+
+---
+
+## Tournament Structure
+
+### Groups
+12 groups (A–L), 4 teams each, 48 teams total.
+
+### Schedule
+- **Round 1 (Matches 1–24):** June 11–17, 2026
+- **Round 2 (Matches 25–48):** June 18–23, 2026  
+- **Round 3 (Matches 49–72):** June 24–27, 2026
+- **Deadline:** June 11, 2026 at 19:00 UTC (before the first match)
+
+### Qualification
+- Top 2 per group → Round of 32 (24 teams)
+- Best 8 third-place teams → Round of 32 (8 teams)
+- Total R32 field: 32 teams
+
+---
+
+## Design & UX
+
+### Visual Identity
+- **Colors:** Dark navy (#0B1F3A), off-white (#F7F4EC), gold (#E8B23A), green (#1F7A4D), red (#C0392B)
+- **Fonts:** Anton (display headings), DM Sans (body text), DM Mono (timestamps and scores)
+- **Layout:** Mobile-first, max-width 720px, all inline styles
+
+### Mobile Experience
+- Designed primarily for mobile use (friends checking on phones)
+- Large tap targets for score inputs and team selection buttons
+- Sticky toast notifications for save confirmations
+- Tab bar at the top with horizontal scroll on narrow screens
+
+---
+
+## Security & Trust Model
+
+- **No authentication** — no passwords, no accounts, no email verification
+- **Honor system** — players are trusted to access only their own picks
+- **Open Firestore rules** — the database allows read/write from any client
+- **Commissioner is informal** — any logged-in player can access the Results tab and modify scores
+- **This is appropriate for the use case** — a small group of friends who know and trust each other
