@@ -1204,17 +1204,42 @@ function Analysis({ entries, results, players }) {
         <h2 style={h2Style}>THE CRYSTAL BALL IS CRACKED</h2>
         <p style={{ fontSize: 12, color: C.mute, fontFamily: "'DM Mono', monospace", margin: "4px 0 14px" }}>First round results vs. {names.length} sets of predictions</p>
 
-        <p style={pStyle}>
-          {firstRoundPlayed.length} of the first 24 group matches are in the books, and the pool's collective crystal ball has already taken a beating.
-          {shockers.length > 0 && ` ${shockers.length} result${shockers.length > 1 ? "s" : ""} caught almost everyone off guard.`}
-          {nailed.length > 0 && ` Meanwhile, ${nailed.length} match${nailed.length > 1 ? "es were" : " was"} so predictable the pool basically called ${nailed.length > 1 ? "them" : "it"} unanimously.`}
-        </p>
+        {(() => {
+          const totalCorrect = firstRoundData.reduce((s, d) => s + d.correct, 0);
+          const totalPreds = firstRoundData.reduce((s, d) => s + d.total, 0);
+          const poolPct = totalPreds > 0 ? Math.round(100 * totalCorrect / totalPreds) : 0;
+          const totalExact = firstRoundData.reduce((s, d) => s + d.exactMatches.length, 0);
+          return (<>
+            <p style={pStyle}>
+              All 24 opening matches are in the books, and the pool's collective crystal ball has taken a beating.
+              Across {names.length} players and {firstRoundPlayed.length} matches, we made {totalPreds} predictions — and got the outcome right just {poolPct}% of the time.
+              {shockers.length > 0 && ` A whopping ${shockers.length} result${shockers.length > 1 ? "s" : ""} caught almost everyone off guard.`}
+              {nailed.length > 0 && ` On the flip side, ${nailed.length} match${nailed.length > 1 ? "es were" : " was"} so predictable the pool nailed ${nailed.length > 1 ? "them" : "it"} almost unanimously.`}
+              {totalExact > 0 && ` There were ${totalExact} exact score predictions across the entire pool — not bad for 24 games.`}
+            </p>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", margin: "12px 0" }}>
+              {[
+                { label: "Matches", value: firstRoundPlayed.length, sub: "first round complete" },
+                { label: "Pool Accuracy", value: `${poolPct}%`, sub: `${totalCorrect}/${totalPreds} correct` },
+                { label: "Shockers", value: shockers.length, sub: "almost nobody got right" },
+                { label: "Exact Scores", value: totalExact, sub: "nailed it perfectly" },
+              ].map((s, i) => (
+                <div key={i} style={{ flex: "1 1 140px", background: C.paper, borderRadius: 6, padding: "12px 14px", textAlign: "center", border: `1px solid ${C.line}` }}>
+                  <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "Anton, sans-serif", color: C.ink }}>{s.value}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.ink, marginTop: 2 }}>{s.label}</div>
+                  <div style={{ fontSize: 10, color: C.mute }}>{s.sub}</div>
+                </div>
+              ))}
+            </div>
+          </>);
+        })()}
 
         {/* Shockers */}
         {shockers.length > 0 && (<>
           <h3 style={h3Style}>NOBODY SAW THAT COMING</h3>
           <p style={pStyle}>
-            These results left the pool speechless. Out of {names.length} predictions, almost nobody got the right outcome.
+            These results left the pool speechless. When {names.length} people make predictions and nearly zero get it right, that's the beautiful game doing its thing.
+            {shockers.filter((d) => d.correct === 0).length > 0 && ` ${shockers.filter((d) => d.correct === 0).length} match${shockers.filter((d) => d.correct === 0).length > 1 ? "es" : ""} had a perfect 0/${names.length} correct rate — literally no one in the pool saw it coming.`}
           </p>
           {shockers.map((d) => (
             <div key={d.mm.m} style={{ background: C.paper, borderRadius: 6, padding: "12px 14px", marginBottom: 8, borderLeft: `4px solid ${C.red}` }}>
@@ -1235,7 +1260,8 @@ function Analysis({ entries, results, players }) {
         {nailed.length > 0 && (<>
           <h3 style={h3Style}>THE SURE THINGS</h3>
           <p style={pStyle}>
-            Some matches played out exactly as the crowd expected. These were the gimmes — almost everyone got them right.
+            Not everything was chaos. These matches played out exactly as the crowd expected — the favourites won, the pool collected easy points, and order was restored.
+            {nailed.filter((d) => d.exactMatches.length > 0).length > 0 && ` Even better, some people nailed the exact scoreline.`}
           </p>
           {nailed.map((d) => (
             <div key={d.mm.m} style={{ background: C.paper, borderRadius: 6, padding: "12px 14px", marginBottom: 8, borderLeft: `4px solid ${C.pitch}` }}>
@@ -1285,9 +1311,13 @@ function Analysis({ entries, results, players }) {
 
         {/* Early accuracy */}
         {firstRoundPlayed.length > 0 && (<>
-          <h3 style={h3Style}>EARLY ACCURACY LEADERBOARD</h3>
+          <h3 style={h3Style}>FIRST ROUND ACCURACY LEADERBOARD</h3>
           <p style={pStyle}>
-            Who's reading the tournament best so far? Correct outcome picks out of {firstRoundPlayed.length} first-round matches.
+            Who read the opening round best? Out of {firstRoundPlayed.length} matches,{" "}
+            {accuracy[0] && `${accuracy[0].name} leads the way with ${accuracy[0].correct} correct (${accuracy[0].pct}%).`}
+            {accuracy.length > 1 && accuracy[1].correct === accuracy[0].correct && ` Though it's a tie at the top — ${accuracy.filter((a) => a.correct === accuracy[0].correct).map((a) => a.name).join(", ")} are all knotted up.`}
+            {accuracy.length > 0 && accuracy[accuracy.length - 1].correct > 0 && ` At the other end, ${accuracy[accuracy.length - 1].name} is bringing up the rear with ${accuracy[accuracy.length - 1].correct}.`}
+            {" "}Remember, this is just group outcomes — the big knockout points haven't kicked in yet.
           </p>
           <HBar
             data={accuracy.map((a) => ({ label: a.name, value: a.correct, color: a.correct >= accuracy[0].correct ? C.pitch : a.correct >= accuracy[Math.floor(accuracy.length / 2)].correct ? C.ink : C.mute }))}
@@ -1309,12 +1339,12 @@ function Analysis({ entries, results, players }) {
         <h3 style={h3Style}>THE CHAMPION QUESTION</h3>
         <p style={pStyle}>
           {champSorted.length > 0 && champSorted[0][1].length >= 5
-            ? `${champSorted[0][0]} is the runaway favourite, backed by ${champSorted[0][1].length} of ${names.length} players (${Math.round(100 * champSorted[0][1].length / names.length)}%). `
+            ? `${champSorted[0][0]} is the runaway favourite to win it all, backed by ${champSorted[0][1].length} of ${names.length} players (${Math.round(100 * champSorted[0][1].length / names.length)}%). That's a lot of eggs in one basket. `
             : "No team dominates the champion picks — the pool is split. "}
           {champSorted.length > 1 && `${champSorted[1][0]} comes in second with ${champSorted[1][1].length} pick${champSorted[1][1].length > 1 ? "s" : ""}.`}
-          {noChamp.length > 0 && ` ${noChamp.length} player${noChamp.length > 1 ? "s" : ""} didn't commit to a champion pick (living dangerously).`}
+          {noChamp.length > 0 && ` ${noChamp.length} player${noChamp.length > 1 ? "s" : ""} didn't fill out their knockout bracket — ${noChamp.length > 1 ? "they're" : "that's"} leaving up to 21 champion points on the table.`}
           {champSorted.length > 0 && champSorted[champSorted.length - 1][1].length === 1 &&
-            ` ${champSorted[champSorted.length - 1][1][0]} is riding solo with ${champSorted[champSorted.length - 1][0]} — bold move.`}
+            ` ${champSorted[champSorted.length - 1][1][0]} is riding solo with ${champSorted[champSorted.length - 1][0]} — if that pays off, nobody else gets those 21 points.`}
         </p>
 
         <HBar
@@ -1441,7 +1471,7 @@ function Analysis({ entries, results, players }) {
 
         <p style={pStyle}>
           Before a ball was kicked, our {names.length} predictors locked in their scores for all 72 group matches.
-          For the first round of 24 games, some results were near-unanimous while others split the room.
+          For the opening round of 24 games, some results were so obvious that every single person picked the same outcome — while others split the room right down the middle. Here's what the hivemind looked like, and where reality had other plans.
         </p>
 
         {(() => {
@@ -1515,8 +1545,8 @@ function Analysis({ entries, results, players }) {
         {/* Lone wolves */}
         <h3 style={h3Style}>LONE WOLF PICKS</h3>
         <p style={pStyle}>
-          These brave souls were the only person in the entire pool to pick a particular outcome in a first-round match.
-          Being a lone wolf is either prophetic or painful — there is no middle ground.
+          These brave souls were the only person in the entire pool to pick a particular first-round outcome.
+          Being a lone wolf is either prophetic or painful — there is no middle ground. Check marks are geniuses, crosses are... optimists.
         </p>
         {(() => {
           const loneWolves = [];
