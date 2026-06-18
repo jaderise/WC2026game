@@ -2,7 +2,7 @@
 
 ## Architecture Overview
 
-The app is a single-page React application with a Firestore backend. All application logic, components, and styling live in a single file (`src/App.jsx`, ~1580 lines). There is no router, no CSS files, and no server-side code.
+The app is a single-page React application with a Firestore backend. All application logic, components, and styling live in a single file (`src/App.jsx`, ~1750 lines). There is no router, no CSS files, and no server-side code.
 
 ```
 Browser (React SPA)
@@ -150,6 +150,28 @@ const docId = (key) => key.replaceAll(":", "__");
   }
 }
 ```
+
+**`wc26__analysis`** — Frozen analysis snapshot (single document)
+```json
+{
+  "key": "wc26:analysis",
+  "value": {
+    "publishedAt": "2026-06-18T15:39:19.415Z",
+    "snapshot": {
+      "playerPicks": {
+        "Jason": { "scores": { "1": { "hg": 2, "ag": 1 }, ... }, "advanced": { "r16": [...], ... } },
+        "Gary": { ... }
+      },
+      "results": {
+        "scores": { "1": { "hg": 2, "ag": 0, ... }, ... },
+        "advanced": { "r32": [], "r16": [], ... }
+      }
+    }
+  }
+}
+```
+
+The snapshot freezes all player picks and match results at the time `analytics.mjs` is run. The Analysis tab renders entirely from this frozen data, so analysis cards don't change as new match results come in. Running `analytics.mjs` again overwrites the snapshot with fresh data.
 
 ### Firestore Security Rules
 
@@ -324,10 +346,10 @@ Only the outcome matters (H/D/A), not the exact score.
 | `SegBtn` | options, value, onChange | Segmented button group |
 | `TieResolver` | label, teams, current, onSet | Interactive tiebreaker UI |
 
-### Analysis Components *(Upcoming — Not Yet Deployed)*
+### Analysis Components
 | Component | Props | Role |
 |-----------|-------|------|
-| `Analysis` | entries, results, players | Blog-style analytics page with 3 post cards |
+| `Analysis` | snapshot | Blog-style analytics page with 4 post cards, rendered from a frozen Firestore snapshot |
 | `HBar` | data, maxVal, barColor, height, showPct, total | Horizontal bar chart |
 | `DotRow` | label, outcomes, playerNames, total | Dot matrix for match outcome distribution |
 
@@ -353,7 +375,7 @@ All state lives in the root `App` component via `useState`. No external state li
 | `standRows` | array | Computed standings (lazy-loaded) |
 | `confirmReset` | boolean | Double-tap confirmation for sandbox reset |
 | `leagueEntries` | array | All player data for League Picks tab |
-| `analysisEntries` | array | All player data for Analysis tab |
+| `analysisPosts` | object\|null | Frozen analysis snapshot loaded from Firestore |
 | `confirmReveal` | boolean | Double-tap confirmation for reveal toggle |
 
 **Derived (useMemo):**
@@ -403,7 +425,7 @@ Serves `dist/` directory. SPA rewrite rule sends all routes to `index.html`.
 
 ## Analytics Script
 
-`analytics.mjs` is a standalone Node.js script that connects directly to Firestore and generates a console report of all player picks. It uses the same Firebase config as the app.
+`analytics.mjs` is a standalone Node.js script that connects directly to Firestore. It reads all player picks and match results, generates a console report, and **saves a frozen snapshot** to Firestore under the `wc26:analysis` key. The Analysis tab in the app renders entirely from this saved snapshot.
 
 **Usage:**
 ```bash
@@ -411,7 +433,12 @@ cd wc-pool
 node analytics.mjs
 ```
 
-**Output includes:**
+**What it does:**
+1. Reads all player picks and match results from Firestore
+2. Prints a detailed console report (champion picks, accuracy rankings, consensus analysis, etc.)
+3. Saves a frozen snapshot to Firestore containing all player picks and results at the current point in time
+
+**Console output includes:**
 - Champion pick distribution
 - Finalist and semifinalist pick tallies
 - Most agreed-upon and most divided group matches
@@ -420,6 +447,12 @@ node analytics.mjs
 - Predicted group winners
 - Score prediction style (avg goals, home/draw/away tendencies)
 - Results so far with accuracy rankings and exact score matches
+
+**Snapshot saved to Firestore:**
+- Key: `wc26:analysis`
+- Contains `publishedAt` timestamp and `snapshot` with `playerPicks` and `results`
+- Running the script again overwrites the previous snapshot with fresh data
+- The Analysis tab displays a date stamp from `publishedAt` so users know when the analysis was captured
 
 ---
 

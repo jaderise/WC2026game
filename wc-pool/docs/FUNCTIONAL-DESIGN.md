@@ -42,12 +42,12 @@ The primary tab where players enter and manage their predictions.
 - The player's predicted Round of 32 qualifiers are automatically derived from their group picks (top 2 per group + best 8 third-place teams)
 
 **Knockout Picks**
-- Players select which teams they believe will reach each round:
-  - Round of 16: 16 teams (from their auto-calculated R32)
-  - Quarterfinals: 8 teams (from their R16 picks)
-  - Semifinals: 4 teams (from their QF picks)
-  - Final: 2 teams (from their SF picks)
-  - Champion: 1 team (from their Final picks)
+- Players select which teams they believe will reach each round. Each round shows clear instructions: "Pick X teams you think will reach [round]" with a red "— N more needed" indicator when the selection is incomplete:
+  - Round of 16: Pick 16 teams (from their auto-calculated R32)
+  - Quarterfinals: Pick 8 teams (from their R16 picks)
+  - Semifinals: Pick 4 teams (from their QF picks)
+  - Final: Pick 2 teams (from their SF picks)
+  - Champion: Pick 1 team (from their Final picks)
 - Each round cascades from the previous — removing a team from an earlier round automatically removes it from all later rounds
 
 **Save & Lock Controls**
@@ -88,28 +88,34 @@ Shows every player's full bracket, allowing comparison across the pool.
   - All 72 group stage score predictions
 - When hidden, displays "PICKS ARE SECRET" message
 
-### Tab 5: Analysis *(Upcoming — Not Yet Deployed)*
+### Tab 5: Analysis
 
-A blog-style analytics page with data visualizations and narratives about the pool's collective predictions.
+A blog-style analytics page with data visualizations and narratives about the pool's collective predictions. All analysis is rendered from a **frozen snapshot** saved to Firestore, so the analysis cards don't change as new match results come in. New snapshots are created by running the `analytics.mjs` script.
 
-Posts are stacked newest-on-top. The initial release includes three posts:
+The page displays a timestamp showing when the snapshot was captured. The initial release includes four post cards:
 
 **Post 1: "The Crystal Ball Is Cracked" — Opening Matchday Report**
+- Summary stats (matches played, pool accuracy %, shockers, exact scores)
 - Highlights matches where almost nobody predicted the correct outcome ("Nobody Saw That Coming")
 - Highlights matches nearly everyone got right ("The Sure Things")
-- Match-by-match dot matrix showing each player's pick vs. the actual result
-- Early accuracy leaderboard (horizontal bar chart)
+- Match-by-match dot matrix showing each player's pick vs. the actual result (colored squares per player)
+- First round accuracy leaderboard (horizontal bar chart)
 
 **Post 2: "Where The Pool Agrees — And Doesn't" — Champion & Knockout Vision**
 - Champion pick distribution (horizontal bar chart with player names)
 - Semifinal team popularity chart
-- "Hive Mind vs. Mavericks" — who has the most/least mainstream bracket
+- "Hive Mind vs. Mavericks" — who has the most/least mainstream bracket (average shared semifinal picks)
 - Final matchup grid showing each player's predicted final and winner
 
 **Post 3: "The Scores We All Agreed On (And The Ones We Didn't)" — Group Stage Consensus**
 - Matches with 100% agreement on outcome (with check/cross showing if reality matched)
 - Most divided matches (proportional split bars showing home/draw/away distribution)
-- "Lone Wolf Picks" — players who were the only person to pick a particular outcome
+- "Lone Wolf Picks" — players who were the only person to pick a particular outcome (marked "genius!" if correct)
+
+**Post 4: "What's Coming in Round 2" — Round 2 Preview**
+- Consensus matches where all players agree on the outcome
+- Toss-up matches with no dominant prediction (split bars)
+- Full match-by-match breakdown with prediction distribution, favourite scores, and lone wolf picks
 
 Analysis by Claude is credited on the page.
 
