@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, getDocs } from "firebase/firestore";
+import { getFirestore, collection, getDocs, doc, setDoc } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAH9dOS457vf048dBBqSXejZMD97GX_1wE",
@@ -406,6 +406,29 @@ async function main() {
       console.log(`    ${i + 1}. ${a.name.padEnd(20)} ${a.correct}/${playedMatches.length} (${a.pct}%)`);
     });
   }
+
+  // --- Save frozen snapshot to Firestore ---
+  console.log("\n" + "━".repeat(60));
+  console.log("Saving analysis snapshot to Firestore...");
+  console.log("━".repeat(60));
+
+  const snapPicks = {};
+  for (const id of playerIds) {
+    const name = players[id];
+    snapPicks[name] = playerData[id].picks || { scores: {}, advanced: {} };
+  }
+  const analysisDoc = {
+    publishedAt: new Date().toISOString(),
+    snapshot: {
+      playerPicks: snapPicks,
+      results: { scores: results.scores || {}, advanced: results.advanced || {} },
+    },
+  };
+  const K_ANALYSIS = NS + "analysis";
+  const docId = K_ANALYSIS.replaceAll(":", "__");
+  await setDoc(doc(db, "pool", docId), { value: analysisDoc });
+  console.log("Snapshot saved to Firestore at key:", K_ANALYSIS);
+  console.log("Timestamp:", analysisDoc.publishedAt);
 
   console.log("\n" + "━".repeat(60));
   console.log("Done!");

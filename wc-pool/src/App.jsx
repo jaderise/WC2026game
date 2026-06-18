@@ -157,6 +157,7 @@ function liveSubscribe(onChange) {
 }
 
 const K_RESULTS = NS + "results";
+const K_ANALYSIS = NS + "analysis";
 const playerKey = (id) => `${NS}player:${id}`;
 const K_PLAYERS = NS + "players";
 
@@ -308,7 +309,7 @@ export default function App() {
   const [standRows, setStandRows] = useState([]);
   const [confirmReset, setConfirmReset] = useState(false);
   const [leagueEntries, setLeagueEntries] = useState([]);
-  const [analysisEntries, setAnalysisEntries] = useState([]);
+  const [analysisPosts, setAnalysisPosts] = useState(null);
   const [confirmReveal, setConfirmReveal] = useState(false);
 
   const now = Date.now();
@@ -478,10 +479,9 @@ export default function App() {
 
   useEffect(() => { (async () => {
     if (tab !== "analysis") return;
-    const ids = await sList(NS + "player:"); const out = [];
-    for (const key of ids) { const data = await sGet(key); if (!data) continue; out.push({ id: key, name: data.name || key, picks: data.picks || emptyPicks(), locked: !!data.locked }); }
-    setAnalysisEntries(out);
-  })(); }, [tab, results]);
+    const saved = await sGet(K_ANALYSIS);
+    setAnalysisPosts(saved || null);
+  })(); }, [tab]);
 
   useEffect(() => { (async () => {
     if (tab !== "league") return;
@@ -511,7 +511,7 @@ export default function App() {
       {tab === "tables" && <Tables qual={qual} />}
       {tab === "standings" && <Standings rows={standRows} autoReady={qual.allComplete} />}
       {tab === "league" && <LeaguePicks entries={leagueEntries} revealed={results.revealed} />}
-      {tab === "analysis" && <Analysis entries={analysisEntries} results={results} players={players} />}
+      {tab === "analysis" && <Analysis snapshot={analysisPosts} />}
       {tab === "updates" && <Updates announcements={results.announcements || []} onPost={postAnnouncement} onDelete={deleteAnnouncement} isCommissioner={!!playerId} />}
       {tab === "results" && (playerId
         ? <Results results={results} setScore={setScore} toggleResultAdvance={toggleResultAdvance} qual={qual} setManualOrder={setManualOrder} setManualThird={setManualThird} feedStatus={feedStatus} feedAt={results.feedAt} onToggleReveal={toggleReveal} confirmReveal={confirmReveal} setConfirmReveal={setConfirmReveal} onToggleEditing={toggleEditingOpen} />
@@ -1120,22 +1120,13 @@ function DotRow({ label, outcomes, playerNames, total }) {
 }
 
 /* ---------- Analysis Blog Component ---------- */
-function Analysis({ entries, results, players }) {
-  const playerIds = Object.keys(players || {});
-  const n = playerIds.length;
-  if (n === 0) return <div style={{ padding: "30px 18px", color: C.mute }}>No player data available yet.</div>;
+function Analysis({ snapshot }) {
+  if (!snapshot || !snapshot.snapshot) return <div style={{ padding: "30px 18px", color: C.mute }}>No analysis published yet.</div>;
 
-  const playerPicks = {};
-  for (const e of entries) {
-    const id = e.id.replace(NS + "player:", "").replace(`${NS.replace(":", "__")}player__`, "");
-    playerPicks[e.name] = e.picks || emptyPicks();
-  }
-  const names = Object.keys(playerPicks);
-  if (names.length === 0) return <div style={{ padding: "30px 18px", color: C.mute }}>Loading analysis data…</div>;
-
-  const actualScores = results.scores || {};
-  const playedMatches = MATCHES.filter((mm) => actualScores[mm.m] && actualScores[mm.m].hg != null);
-  const firstRoundMatches = MATCHES.filter((mm) => mm.m >= 1 && mm.m <= 24);
+  const { playerPicks, results: snapResults } = snapshot.snapshot;
+  const names = Object.keys(playerPicks).sort();
+  const actualScores = snapResults.scores || {};
+  const firstRoundMatches = MATCHES.filter((mm) => mm.m <= 24);
   const firstRoundPlayed = firstRoundMatches.filter((mm) => actualScores[mm.m] && actualScores[mm.m].hg != null);
 
   // Champion data
@@ -1203,7 +1194,7 @@ function Analysis({ entries, results, players }) {
     <div style={{ padding: "20px 14px" }}>
       <Eyebrow>Pool Analytics</Eyebrow>
       <h1 style={{ fontFamily: "Anton, sans-serif", fontWeight: 400, fontSize: 36, lineHeight: 1, margin: "6px 0 4px" }}>THE BREAKDOWN</h1>
-      <p style={{ fontSize: 12, color: C.mute, margin: "0 0 24px", fontFamily: "'DM Mono', monospace" }}>Analysis by Claude · Updated as the tournament unfolds</p>
+      <p style={{ fontSize: 12, color: C.mute, margin: "0 0 24px", fontFamily: "'DM Mono', monospace" }}>Analysis by Claude · {snapshot.publishedAt ? new Date(snapshot.publishedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Snapshot"}</p>
 
       {/* ===== POST 1: Opening Matchday Report ===== */}
       <div style={cardStyle}>
