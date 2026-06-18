@@ -1588,7 +1588,7 @@ function Analysis({ entries, results, players }) {
                   </div>
                   <div style={{ flex: 1, fontSize: 13 }}>
                     <span style={{ fontWeight: 700 }}>{lw.name}</span> alone picked <span style={{ fontWeight: 700 }}>{lw.label}</span> in {lw.mm.h} vs {lw.mm.a} ({lw.score})
-                    {lw.hasResult && <span style={{ color: lw.wasRight ? C.pitch : C.red, fontWeight: 600 }}> — {lw.wasRight ? "genius!" : "nope"}</span>}
+                    {lw.hasResult && lw.wasRight && <span style={{ color: C.pitch, fontWeight: 600 }}> — genius!</span>}
                   </div>
                 </div>
               ))}
