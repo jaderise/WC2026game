@@ -770,16 +770,26 @@ function KnockoutPicks({ picks, editable, toggleAdvance, myR32info }) {
           </div>
         )}
       </div>
-      <p style={{ fontSize: 13, color: C.mute, lineHeight: 1.5 }}>Each round below offers only the teams you advanced from the round before it. Narrow your bracket down to a champion.</p>
+      <p style={{ fontSize: 13, color: C.mute, lineHeight: 1.5 }}>For each round below, tap the teams you think will advance. You must fill every slot — leaving picks empty means leaving points on the table.</p>
       {ROUNDS.filter((r) => r.key !== "r32").map((r) => {
         const chosen = new Set(picks.advanced[r.key] || []);
         const pool = poolFor(r.key);
         const prevLabel = { r16: "your Round of 32", qf: "your Round of 16", sf: "your Quarterfinalists", final: "your Semifinalists", champ: "your Finalists" }[r.key];
+        const instruction = {
+          r16: `Pick ${r.count} teams you think will win their R32 match and advance to the Round of 16`,
+          qf: `Pick ${r.count} teams you think will reach the Quarterfinals`,
+          sf: `Pick ${r.count} teams you think will reach the Semifinals`,
+          final: `Pick ${r.count} teams you think will play in the Final`,
+          champ: `Pick your World Cup winner`,
+        }[r.key];
         return (
           <div key={r.key} style={{ marginBottom: 20 }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
               <span style={{ fontFamily: "Anton, sans-serif", fontSize: 20 }}>{r.label.toUpperCase()}</span>
-              <span style={{ fontSize: 11.5, color: C.mute, fontFamily: "'DM Mono', monospace" }}>{chosen.size}/{r.count} · {r.pts} pts each</span>
+              <span style={{ fontSize: 11.5, color: C.mute, fontFamily: "'DM Mono', monospace" }}>{chosen.size}/{r.count} picked · {r.pts} pts each</span>
+            </div>
+            <div style={{ fontSize: 12, color: chosen.size < r.count && pool.length > 0 ? C.red : C.mute, marginBottom: 6, fontWeight: chosen.size < r.count && pool.length > 0 ? 600 : 400 }}>
+              {instruction}{chosen.size < r.count && pool.length > 0 ? ` — ${r.count - chosen.size} more needed` : chosen.size === r.count ? " ✓" : ""}
             </div>
             {pool.length === 0 ? (
               <div style={{ fontSize: 12.5, color: C.mute, background: "#F0EBDD", border: `1px solid ${C.line}`, borderRadius: 3, padding: "10px 12px" }}>
