@@ -1597,6 +1597,126 @@ function Analysis({ entries, results, players }) {
         })()}
       </div>
 
+      {/* ===== POST 4: Round 2 Preview ===== */}
+      {(() => {
+        const r2Matches = MATCHES.filter((mm) => mm.m >= 25 && mm.m <= 48);
+        const r2Data = r2Matches.map((mm) => {
+          const outcomes = { H: 0, D: 0, A: 0 };
+          const exactScores = {};
+          const loneWolves = [];
+          for (const name of names) {
+            const s = (playerPicks[name].scores || {})[mm.m];
+            const o = predOutcome(s);
+            if (o) outcomes[o]++;
+            if (s && s.hg != null && s.ag != null) {
+              const key = `${s.hg}-${s.ag}`;
+              exactScores[key] = (exactScores[key] || 0) + 1;
+            }
+          }
+          const total = outcomes.H + outcomes.D + outcomes.A;
+          const maxEntry = Object.entries(outcomes).sort((a, b) => b[1] - a[1])[0];
+          const topScore = Object.entries(exactScores).sort((a, b) => b[1] - a[1])[0];
+          const consensusPct = total > 0 ? Math.round(100 * maxEntry[1] / total) : 0;
+          for (const name of names) {
+            const s = (playerPicks[name].scores || {})[mm.m];
+            const o = predOutcome(s);
+            if (!o) continue;
+            let others = 0;
+            for (const other of names) { if (other === name) continue; const os = (playerPicks[other].scores || {})[mm.m]; if (predOutcome(os) === o) others++; }
+            if (others === 0) loneWolves.push({ name, outcome: o, score: s ? `${s.hg}-${s.ag}` : "?" });
+          }
+          const actual = actualScores[mm.m];
+          return { mm, outcomes, total, maxEntry, topScore, consensusPct, loneWolves, actual };
+        });
+        const unanimous = r2Data.filter((d) => d.consensusPct === 100);
+        const divided = r2Data.filter((d) => d.consensusPct < 60).sort((a, b) => a.consensusPct - b.consensusPct);
+        const contrarian = r2Data.filter((d) => d.loneWolves.length > 0);
+        return (
+          <div style={cardStyle}>
+            <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+              <span style={tagStyle(C.ink)}>MATCHDAY 3-4</span>
+              <span style={tagStyle(C.sun)}>PREVIEW</span>
+            </div>
+            <h2 style={h2Style}>WHAT'S COMING IN ROUND 2</h2>
+            <p style={{ fontSize: 12, color: C.mute, fontFamily: "'DM Mono', monospace", margin: "4px 0 14px" }}>Matches 25–48 · How the pool sees the next 24 games</p>
+
+            <p style={pStyle}>
+              Round 1 humbled us. Now for round 2 — here's how our {names.length} predictors see the next batch of matches shaping up.
+              {unanimous.length > 0 && ` ${unanimous.length} match${unanimous.length > 1 ? "es have" : " has"} 100% consensus — everyone agrees on the outcome.`}
+              {divided.length > 0 && ` ${divided.length} match${divided.length > 1 ? "es are" : " is"} genuinely up for grabs with no clear favourite.`}
+              {contrarian.length > 0 && ` And ${contrarian.length} match${contrarian.length > 1 ? "es feature" : " features"} a lone wolf going against the crowd.`}
+            </p>
+
+            {unanimous.length > 0 && (<>
+              <h3 style={h3Style}>THE POOL AGREES</h3>
+              <p style={pStyle}>Everyone picked the same outcome for these matches. Will round 2 be kinder to the consensus?</p>
+              {unanimous.map((c) => {
+                const label = c.maxEntry[0] === "H" ? `${c.mm.h} win` : c.maxEntry[0] === "A" ? `${c.mm.a} win` : "Draw";
+                const hasResult = c.actual && c.actual.hg != null;
+                const gotRight = hasResult && predOutcome(c.actual) === c.maxEntry[0];
+                const gotWrong = hasResult && predOutcome(c.actual) !== c.maxEntry[0];
+                return (
+                  <div key={c.mm.m} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: `1px solid ${C.line}` }}>
+                    <div style={{ width: 36, height: 36, borderRadius: "50%", background: hasResult ? (gotRight ? C.pitch : C.red) : C.ink, display: "flex", alignItems: "center", justifyContent: "center", color: C.chalk, fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                      {hasResult ? (gotRight ? "✓" : "✗") : "M" + c.mm.m}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 700 }}>{c.mm.h} vs {c.mm.a} <span style={{ fontSize: 12, color: C.mute, fontWeight: 400 }}>{c.mm.d}</span></div>
+                      <div style={{ fontSize: 12, color: C.mute }}>All {c.total} pick: {label}{c.topScore ? ` · Favourite score: ${c.topScore[0]} (${c.topScore[1]}×)` : ""}</div>
+                      {hasResult && <div style={{ fontSize: 12, fontWeight: 600, color: gotRight ? C.pitch : C.red }}>Result: {c.actual.hg}–{c.actual.ag} {gotRight ? "— the pool was right!" : "— surprise!"}</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </>)}
+
+            {divided.length > 0 && (<>
+              <h3 style={h3Style}>THE TOSS-UPS</h3>
+              <p style={pStyle}>These are the matches splitting the room. No dominant prediction — this is where points will be won and lost.</p>
+              {divided.map((c) => (
+                <div key={c.mm.m} style={{ padding: "10px 0", borderBottom: `1px solid ${C.line}` }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 6 }}>{c.mm.h} vs {c.mm.a} <span style={{ fontSize: 12, color: C.mute, fontWeight: 400 }}>M{c.mm.m} · {c.mm.d}</span></div>
+                  <div style={{ display: "flex", gap: 0, height: 28, borderRadius: 4, overflow: "hidden" }}>
+                    {c.outcomes.H > 0 && <div style={{ flex: c.outcomes.H, background: C.pitch, display: "flex", alignItems: "center", justifyContent: "center", color: C.chalk, fontSize: 11, fontWeight: 700 }}>{c.mm.h.split(" ")[0]} {c.outcomes.H}</div>}
+                    {c.outcomes.D > 0 && <div style={{ flex: c.outcomes.D, background: C.sun, display: "flex", alignItems: "center", justifyContent: "center", color: C.chalk, fontSize: 11, fontWeight: 700 }}>Draw {c.outcomes.D}</div>}
+                    {c.outcomes.A > 0 && <div style={{ flex: c.outcomes.A, background: C.red, display: "flex", alignItems: "center", justifyContent: "center", color: C.chalk, fontSize: 11, fontWeight: 700 }}>{c.mm.a.split(" ")[0]} {c.outcomes.A}</div>}
+                  </div>
+                  {c.actual && c.actual.hg != null && <div style={{ fontSize: 12, fontWeight: 600, marginTop: 4, color: C.mute }}>Result: {c.actual.hg}–{c.actual.ag}</div>}
+                </div>
+              ))}
+            </>)}
+
+            {/* All matches overview */}
+            <h3 style={h3Style}>FULL ROUND 2 — MATCH BY MATCH</h3>
+            <p style={pStyle}>Every match with the pool's prediction breakdown. The wider the bar, the stronger the consensus.</p>
+            {r2Data.map((d) => {
+              const favOutcome = d.maxEntry[0] === "H" ? d.mm.h : d.maxEntry[0] === "A" ? d.mm.a : "Draw";
+              const hasResult = d.actual && d.actual.hg != null;
+              const poolRight = hasResult && predOutcome(d.actual) === d.maxEntry[0];
+              return (
+                <div key={d.mm.m} style={{ padding: "8px 0", borderBottom: `1px solid ${C.line}` }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700 }}>M{d.mm.m} {d.mm.h} vs {d.mm.a}</span>
+                    <span style={{ fontSize: 11, color: C.mute }}>{d.mm.d}</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 0, height: 22, borderRadius: 3, overflow: "hidden", marginBottom: 2 }}>
+                    {d.outcomes.H > 0 && <div style={{ flex: d.outcomes.H, background: C.pitch, display: "flex", alignItems: "center", justifyContent: "center", color: C.chalk, fontSize: 10, fontWeight: 700 }}>{d.outcomes.H}</div>}
+                    {d.outcomes.D > 0 && <div style={{ flex: d.outcomes.D, background: C.sun, display: "flex", alignItems: "center", justifyContent: "center", color: C.chalk, fontSize: 10, fontWeight: 700 }}>{d.outcomes.D}</div>}
+                    {d.outcomes.A > 0 && <div style={{ flex: d.outcomes.A, background: C.red, display: "flex", alignItems: "center", justifyContent: "center", color: C.chalk, fontSize: 10, fontWeight: 700 }}>{d.outcomes.A}</div>}
+                  </div>
+                  <div style={{ fontSize: 11, color: C.mute }}>
+                    Favourite: {favOutcome} ({d.consensusPct}%)
+                    {d.topScore && ` · Most picked score: ${d.topScore[0]} (${d.topScore[1]}×)`}
+                    {d.loneWolves.length > 0 && <span style={{ color: C.red, fontWeight: 600 }}> · Lone wolf: {d.loneWolves.map((lw) => `${lw.name} (${lw.outcome === "H" ? d.mm.h : lw.outcome === "A" ? d.mm.a : "Draw"})`).join(", ")}</span>}
+                  </div>
+                  {hasResult && <div style={{ fontSize: 11, fontWeight: 600, color: poolRight ? C.pitch : C.red }}>Result: {d.actual.hg}–{d.actual.ag}</div>}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
+
       <div style={{ textAlign: "center", padding: "20px 0 10px", fontSize: 12, color: C.mute }}>
         More analysis coming as the tournament unfolds.
       </div>
