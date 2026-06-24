@@ -1132,7 +1132,7 @@ function Analysis({ editions }) {
 
   function toggleEdition(idx) { setExpandedEditions((e) => ({ ...e, [idx]: !e[idx] })); }
 
-  function renderMatchdayReport(playerPicks, actualScores, names, roundMatches, roundPlayed, roundLabel, tagLabel) {
+  function renderMatchdayReport(playerPicks, actualScores, names, roundMatches, roundPlayed, roundLabel, tagLabel, headline) {
     const roundData = roundPlayed.map((mm) => {
       const actual = actualScores[mm.m];
       const actualOutcome = predOutcome(actual);
@@ -1171,7 +1171,7 @@ function Analysis({ editions }) {
           <span style={tagStyle(C.ink)}>{tagLabel}</span>
           <span style={tagStyle(C.sun)}>GROUP STAGE</span>
         </div>
-        <h2 style={h2Style}>THE CRYSTAL BALL IS CRACKED</h2>
+        <h2 style={h2Style}>{headline}</h2>
         <p style={{ fontSize: 12, color: C.mute, fontFamily: "'DM Mono', monospace", margin: "4px 0 14px" }}>{roundLabel} results vs. {names.length} sets of predictions</p>
 
         <p style={pStyle}>
@@ -1810,7 +1810,7 @@ function Analysis({ editions }) {
                   const matchRange = edition.matchRange || [1, 24];
                   const roundMatches = MATCHES.filter((mm) => mm.m >= matchRange[0] && mm.m <= matchRange[1]);
                   const roundPlayed = roundMatches.filter((mm) => actualScores[mm.m] && actualScores[mm.m].hg != null);
-                  return <React.Fragment key={ci}>{renderMatchdayReport(playerPicks, actualScores, names, roundMatches, roundPlayed, edition.roundLabel || "First round", edition.tagLabel || "MATCHDAY 1-2")}</React.Fragment>;
+                  return <React.Fragment key={ci}>{renderMatchdayReport(playerPicks, actualScores, names, roundMatches, roundPlayed, edition.roundLabel || "First round", edition.tagLabel || "MATCHDAY 1-2", edition.headline || "THE CRYSTAL BALL IS CRACKED")}</React.Fragment>;
                 }
                 if (card === "standings-movement" && idx < editions.length - 1) {
                   return <React.Fragment key={ci}>{renderStandingsMovement(editions[idx + 1], edition, names)}</React.Fragment>;

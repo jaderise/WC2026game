@@ -443,6 +443,7 @@ async function main() {
     newEdition = {
       id: "round2",
       title: "Round 2 — The Plot Thickens",
+      headline: "THE PLOT THICKENS",
       publishedAt: new Date().toISOString(),
       roundLabel: "Second round",
       tagLabel: "MATCHDAY 3-4",
@@ -457,6 +458,7 @@ async function main() {
     newEdition = {
       id: "round1",
       title: "Round 1 — Opening Salvo",
+      headline: "THE CRYSTAL BALL IS CRACKED",
       publishedAt: new Date().toISOString(),
       roundLabel: "First round",
       tagLabel: "MATCHDAY 1-2",
