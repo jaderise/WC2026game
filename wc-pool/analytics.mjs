@@ -417,11 +417,6 @@ async function main() {
     const name = players[id];
     snapPicks[name] = playerData[id].picks || { scores: {}, advanced: {} };
   }
-  const snapshot = {
-    playerPicks: snapPicks,
-    results: { scores: results.scores || {}, advanced: results.advanced || {} },
-  };
-
   const K_ANALYSIS = NS + "analysis";
   const aDocId = K_ANALYSIS.replaceAll(":", "__");
 
@@ -437,6 +432,17 @@ async function main() {
 
   // Determine which edition to create based on command-line arg
   const editionArg = process.argv[2] || "round1";
+
+  // Filter results to only include matches up to this edition's cutoff
+  const maxMatch = editionArg === "round2" ? 48 : 24;
+  const filteredScores = {};
+  for (const [m, s] of Object.entries(results.scores || {})) {
+    if (Number(m) <= maxMatch) filteredScores[m] = s;
+  }
+  const snapshot = {
+    playerPicks: snapPicks,
+    results: { scores: filteredScores, advanced: results.advanced || {} },
+  };
 
   let newEdition;
   if (editionArg === "round2") {
