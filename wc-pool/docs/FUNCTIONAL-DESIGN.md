@@ -90,32 +90,50 @@ Shows every player's full bracket, allowing comparison across the pool.
 
 ### Tab 5: Analysis
 
-A blog-style analytics page with data visualizations and narratives about the pool's collective predictions. All analysis is rendered from a **frozen snapshot** saved to Firestore, so the analysis cards don't change as new match results come in. New snapshots are created by running the `analytics.mjs` script.
+A blog-style analytics page with data visualizations and narratives about the pool's collective predictions. Analysis is organized into **editions** (e.g., Round 1, Round 2), each rendered from a **frozen snapshot** saved to Firestore so the analysis doesn't change as new match results come in. New editions are created by running `analytics.mjs` with a round argument.
 
-The page displays a timestamp showing when the snapshot was captured. The initial release includes four post cards:
+The latest edition is fully expanded at the top of the page. Older editions collapse into a clickable bar with a chevron (▶) indicator — tap to expand and see the full analysis. Each edition displays its published date.
 
-**Post 1: "The Crystal Ball Is Cracked" — Opening Matchday Report**
+#### Edition 1: "Round 1 — Opening Salvo"
+
+**Card 1: "The Crystal Ball Is Cracked" — Matchday Report (Matches 1–24)**
 - Summary stats (matches played, pool accuracy %, shockers, exact scores)
-- Highlights matches where almost nobody predicted the correct outcome ("Nobody Saw That Coming")
-- Highlights matches nearly everyone got right ("The Sure Things")
+- "Nobody Saw That Coming" — matches where almost nobody predicted the correct outcome
+- "The Sure Things" — matches nearly everyone got right
 - Match-by-match dot matrix showing each player's pick vs. the actual result (colored squares per player)
 - First round accuracy leaderboard (horizontal bar chart)
 
-**Post 2: "Where The Pool Agrees — And Doesn't" — Champion & Knockout Vision**
+**Card 2: "Where The Pool Agrees — And Doesn't" — Champion & Knockout Vision**
 - Champion pick distribution (horizontal bar chart with player names)
 - Semifinal team popularity chart
 - "Hive Mind vs. Mavericks" — who has the most/least mainstream bracket (average shared semifinal picks)
 - Final matchup grid showing each player's predicted final and winner
 
-**Post 3: "The Scores We All Agreed On (And The Ones We Didn't)" — Group Stage Consensus**
+**Card 3: "The Scores We All Agreed On (And The Ones We Didn't)" — Group Stage Consensus**
 - Matches with 100% agreement on outcome (with check/cross showing if reality matched)
 - Most divided matches (proportional split bars showing home/draw/away distribution)
 - "Lone Wolf Picks" — players who were the only person to pick a particular outcome (marked "genius!" if correct)
 
-**Post 4: "What's Coming in Round 2" — Round 2 Preview**
+**Card 4: "What's Coming in Round 2" — Round 2 Preview**
 - Consensus matches where all players agree on the outcome
 - Toss-up matches with no dominant prediction (split bars)
 - Full match-by-match breakdown with prediction distribution, favourite scores, and lone wolf picks
+
+#### Edition 2: "Round 2 — The Plot Thickens"
+
+**Card 1: "The Plot Thickens" — Matchday Report (Matches 25–48)**
+- Same format as Round 1 matchday report but covering the second round of group matches
+
+**Card 2: "Who's Climbing, Who's Sliding?" — Standings Movement**
+- Accuracy rankings comparison between Round 1 and Round 2 snapshots
+- Each player shown with current rank, correct count, and movement arrows (▲ climbed / ▼ dropped / — unchanged)
+- Narrative highlighting the biggest climbers and fallers
+
+**Card 3: "The Scores We All Agreed On" — Round 2 Consensus**
+- Same format as Round 1 consensus card but covering matches 25–48
+
+**Card 4: "What's Coming in Round 3" — Round 3 Preview**
+- Same format as Round 2 preview but covering matches 49–72
 
 Analysis by Claude is credited on the page.
 

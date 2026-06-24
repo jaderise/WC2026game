@@ -151,27 +151,55 @@ const docId = (key) => key.replaceAll(":", "__");
 }
 ```
 
-**`wc26__analysis`** — Frozen analysis snapshot (single document)
+**`wc26__analysis`** — Frozen analysis editions (array of snapshots)
 ```json
 {
   "key": "wc26:analysis",
-  "value": {
-    "publishedAt": "2026-06-18T15:39:19.415Z",
-    "snapshot": {
-      "playerPicks": {
-        "Jason": { "scores": { "1": { "hg": 2, "ag": 1 }, ... }, "advanced": { "r16": [...], ... } },
-        "Gary": { ... }
-      },
-      "results": {
-        "scores": { "1": { "hg": 2, "ag": 0, ... }, ... },
-        "advanced": { "r32": [], "r16": [], ... }
+  "value": [
+    {
+      "id": "round2",
+      "title": "Round 2 — The Plot Thickens",
+      "headline": "THE PLOT THICKENS",
+      "publishedAt": "2026-06-24T04:02:47.017Z",
+      "roundLabel": "Second round",
+      "tagLabel": "MATCHDAY 3-4",
+      "matchRange": [25, 48],
+      "previewRange": [49, 72],
+      "previewLabel": "Round 3",
+      "previewTagLabel": "MATCHDAY 5-6",
+      "cards": ["matchday", "standings-movement", "consensus", "preview"],
+      "snapshot": {
+        "playerPicks": { "Jason": { "scores": {...}, "advanced": {...} }, ... },
+        "results": { "scores": {...}, "advanced": {...} }
       }
+    },
+    {
+      "id": "round1",
+      "title": "Round 1 — Opening Salvo",
+      "headline": "THE CRYSTAL BALL IS CRACKED",
+      "publishedAt": "2026-06-24T04:02:37.610Z",
+      "roundLabel": "First round",
+      "tagLabel": "MATCHDAY 1-2",
+      "matchRange": [1, 24],
+      "previewRange": [25, 48],
+      "previewLabel": "Round 2",
+      "previewTagLabel": "MATCHDAY 3-4",
+      "cards": ["matchday", "knockout-vision", "consensus", "preview"],
+      "snapshot": { ... }
     }
-  }
+  ]
 }
 ```
 
-The snapshot freezes all player picks and match results at the time `analytics.mjs` is run. The Analysis tab renders entirely from this frozen data, so analysis cards don't change as new match results come in. Running `analytics.mjs` again overwrites the snapshot with fresh data.
+Each edition freezes all player picks and match results at the time `analytics.mjs` is run. The Analysis tab renders cards from each edition's frozen data, so analysis doesn't change as new match results come in. Editions are stored newest-first; the latest edition renders fully expanded while older editions are collapsed behind a clickable chevron.
+
+**Edition fields:**
+- `id` — Unique identifier (e.g., "round1", "round2")
+- `title` — Display title shown in the edition header
+- `headline` — Large heading for the matchday report card (unique per edition)
+- `matchRange` — `[first, last]` match numbers for this edition's analysis
+- `previewRange` — `[first, last]` match numbers for the look-ahead preview card
+- `cards` — Array of card types to render: `"matchday"`, `"standings-movement"`, `"knockout-vision"`, `"consensus"`, `"preview"`
 
 ### Firestore Security Rules
 
@@ -349,9 +377,11 @@ Only the outcome matters (H/D/A), not the exact score.
 ### Analysis Components
 | Component | Props | Role |
 |-----------|-------|------|
-| `Analysis` | snapshot | Blog-style analytics page with 4 post cards, rendered from a frozen Firestore snapshot |
+| `Analysis` | editions | Blog-style analytics page with multiple collapsible editions, each rendered from a frozen Firestore snapshot |
 | `HBar` | data, maxVal, barColor, height, showPct, total | Horizontal bar chart |
 | `DotRow` | label, outcomes, playerNames, total | Dot matrix for match outcome distribution |
+
+The Analysis component uses internal render functions for each card type: `renderMatchdayReport`, `renderStandingsMovement`, `renderKnockoutVision`, `renderConsensusCard`, `renderPreviewCard`. Each edition's `cards` array determines which render functions are called.
 
 ---
 
@@ -375,7 +405,7 @@ All state lives in the root `App` component via `useState`. No external state li
 | `standRows` | array | Computed standings (lazy-loaded) |
 | `confirmReset` | boolean | Double-tap confirmation for sandbox reset |
 | `leagueEntries` | array | All player data for League Picks tab |
-| `analysisPosts` | object\|null | Frozen analysis snapshot loaded from Firestore |
+| `analysisPosts` | array | Array of frozen analysis editions loaded from Firestore |
 | `confirmReveal` | boolean | Double-tap confirmation for reveal toggle |
 
 **Derived (useMemo):**
@@ -430,13 +460,15 @@ Serves `dist/` directory. SPA rewrite rule sends all routes to `index.html`.
 **Usage:**
 ```bash
 cd wc-pool
-node analytics.mjs
+node analytics.mjs round1    # Save/update Round 1 edition
+node analytics.mjs round2    # Save/update Round 2 edition
+node analytics.mjs            # Defaults to round1
 ```
 
 **What it does:**
 1. Reads all player picks and match results from Firestore
 2. Prints a detailed console report (champion picks, accuracy rankings, consensus analysis, etc.)
-3. Saves a frozen snapshot to Firestore containing all player picks and results at the current point in time
+3. Saves a frozen edition to Firestore, preserving existing editions in the array
 
 **Console output includes:**
 - Champion pick distribution
@@ -448,11 +480,12 @@ node analytics.mjs
 - Score prediction style (avg goals, home/draw/away tendencies)
 - Results so far with accuracy rankings and exact score matches
 
-**Snapshot saved to Firestore:**
+**Editions saved to Firestore:**
 - Key: `wc26:analysis`
-- Contains `publishedAt` timestamp and `snapshot` with `playerPicks` and `results`
-- Running the script again overwrites the previous snapshot with fresh data
-- The Analysis tab displays a date stamp from `publishedAt` so users know when the analysis was captured
+- Value is an array of edition objects, newest first
+- Each edition contains metadata (title, headline, card types, match ranges) and a `snapshot` with `playerPicks` and `results`
+- Running the script with a round argument replaces that edition's entry while preserving others
+- The Analysis tab displays each edition's `publishedAt` date stamp
 
 ---
 
