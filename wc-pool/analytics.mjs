@@ -417,18 +417,66 @@ async function main() {
     const name = players[id];
     snapPicks[name] = playerData[id].picks || { scores: {}, advanced: {} };
   }
-  const analysisDoc = {
-    publishedAt: new Date().toISOString(),
-    snapshot: {
-      playerPicks: snapPicks,
-      results: { scores: results.scores || {}, advanced: results.advanced || {} },
-    },
+  const snapshot = {
+    playerPicks: snapPicks,
+    results: { scores: results.scores || {}, advanced: results.advanced || {} },
   };
+
   const K_ANALYSIS = NS + "analysis";
-  const docId = K_ANALYSIS.replaceAll(":", "__");
-  await setDoc(doc(db, "pool", docId), { value: analysisDoc });
-  console.log("Snapshot saved to Firestore at key:", K_ANALYSIS);
-  console.log("Timestamp:", analysisDoc.publishedAt);
+  const aDocId = K_ANALYSIS.replaceAll(":", "__");
+
+  // Load existing editions
+  const existingDoc = await getDocs(collection(db, "pool"));
+  let existing = [];
+  existingDoc.forEach((d) => {
+    if (d.id === aDocId) {
+      const val = d.data().value;
+      if (Array.isArray(val)) existing = val;
+    }
+  });
+
+  // Determine which edition to create based on command-line arg
+  const editionArg = process.argv[2] || "round1";
+
+  let newEdition;
+  if (editionArg === "round2") {
+    newEdition = {
+      id: "round2",
+      title: "Round 2 — The Plot Thickens",
+      publishedAt: new Date().toISOString(),
+      roundLabel: "Second round",
+      tagLabel: "MATCHDAY 3-4",
+      matchRange: [25, 48],
+      previewRange: [49, 72],
+      previewLabel: "Round 3",
+      previewTagLabel: "MATCHDAY 5-6",
+      cards: ["matchday", "standings-movement", "consensus", "preview"],
+      snapshot,
+    };
+  } else {
+    newEdition = {
+      id: "round1",
+      title: "Round 1 — Opening Salvo",
+      publishedAt: new Date().toISOString(),
+      roundLabel: "First round",
+      tagLabel: "MATCHDAY 1-2",
+      matchRange: [1, 24],
+      previewRange: [25, 48],
+      previewLabel: "Round 2",
+      previewTagLabel: "MATCHDAY 3-4",
+      cards: ["matchday", "knockout-vision", "consensus", "preview"],
+      snapshot,
+    };
+  }
+
+  // Replace edition with same id, or prepend
+  const filtered = existing.filter((e) => e.id !== newEdition.id);
+  const editions = [newEdition, ...filtered];
+
+  await setDoc(doc(db, "pool", aDocId), { value: editions });
+  console.log("Edition saved:", newEdition.id, "(" + newEdition.title + ")");
+  console.log("Total editions:", editions.length);
+  console.log("Timestamp:", newEdition.publishedAt);
 
   console.log("\n" + "━".repeat(60));
   console.log("Done!");
