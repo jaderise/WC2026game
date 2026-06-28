@@ -202,7 +202,7 @@ const K_ANALYSIS = NS + "analysis";
 const playerKey = (id) => `${NS}player:${id}`;
 const K_PLAYERS = NS + "players";
 
-const emptyResults = () => ({ scores: {}, advanced: { r32: [], r16: [], qf: [], sf: [], final: [], champ: [] }, advancedMeta: {}, manualOrder: {}, manualThird: [], revealed: false, feedAt: null });
+const emptyResults = () => ({ scores: {}, advanced: { r32: [], r16: [], qf: [], sf: [], final: [], champ: [] }, advancedMeta: {}, koScores: {}, manualOrder: {}, manualThird: [], revealed: false, feedAt: null });
 const emptyPicks = () => ({ scores: {}, advanced: { r16: [], qf: [], sf: [], final: [], champ: [] } });
 
 /* ---------- standings engine ---------- */
@@ -325,6 +325,47 @@ function parseFeedScores(json) {
   return out;
 }
 
+/* ---- Knockout feed parsing (matches 73–104, incl. extra time & penalties) ---- */
+function koWinnerFromScore(s, t1, t2) {
+  if (!s) return null;
+  if (s.p && s.p.length === 2 && s.p[0] !== s.p[1]) return s.p[0] > s.p[1] ? t1 : t2; // penalties
+  const base = (s.et && s.et.length === 2) ? s.et : s.ft; // after extra time, else 90'
+  if (!base || base.length !== 2 || base[0] === base[1]) return null;
+  return base[0] > base[1] ? t1 : t2;
+}
+function parseFeedKnockout(json) {
+  const out = {};
+  if (!json || !Array.isArray(json.matches)) return out;
+  for (const g of json.matches) {
+    if (typeof g.num !== "number" || g.num < 73 || g.num > 104) continue;
+    const s = g.score;
+    if (!s || !s.ft || s.ft.length !== 2) continue;
+    const t1 = normalizeFeedTeam(g.team1), t2 = normalizeFeedTeam(g.team2);
+    if (!ALL_TEAMS.includes(t1) || !ALL_TEAMS.includes(t2)) continue; // skip unresolved placeholder slots
+    out[g.num] = { a: t1, b: t2, ft: s.ft || null, et: s.et || null, pen: s.p || null, winner: koWinnerFromScore(s, t1, t2) };
+  }
+  return out;
+}
+function deriveAdvancedFromKO(ko) {
+  const rounds = { r16: [], qf: [], sf: [], final: [], champ: [] };
+  for (const m of KNOCKOUT) {
+    if (m.r === "third") continue;
+    const ks = ko[m.n];
+    if (!ks || !ks.winner) continue;
+    const target = KO_NEXT[m.r];
+    if (rounds[target]) rounds[target].push(ks.winner);
+  }
+  return rounds;
+}
+function koResultText(ks) {
+  if (!ks || !ks.ft) return null;
+  const base = ks.et || ks.ft;
+  let s = base[0] + "–" + base[1];
+  if (ks.et && ks.ft && (ks.et[0] !== ks.ft[0] || ks.et[1] !== ks.ft[1])) s += " a.e.t.";
+  if (ks.pen) s += ` (pen ${ks.pen[0]}–${ks.pen[1]})`;
+  return s;
+}
+
 const C = { ink: "#0B1F3A", paper: "#F7F4EC", line: "#D9D2C2", sun: "#E8B23A", pitch: "#1F7A4D", red: "#C0392B", mute: "#6B6353", chalk: "#FFFFFF" };
 function Eyebrow({ children }) { return <div style={{ fontSize: 11, letterSpacing: ".18em", textTransform: "uppercase", color: C.mute, fontWeight: 700 }}>{children}</div>; }
 function abbr(name) {
@@ -394,12 +435,31 @@ export default function App() {
         const json = await r.json();
         const parsed = parseFeedScores(json);
         if (!alive) return;
+        const koParsed = parseFeedKnockout(json);
         const cur = (await sGet(K_RESULTS)) || emptyResults();
         cur.scores = cur.scores || {};
         for (const [mid, sc] of Object.entries(parsed)) {
           const ex = cur.scores[mid];
           if (ex && ex.by && ex.by !== "openfootball") continue;
           if (!ex || ex.hg !== sc.hg || ex.ag !== sc.ag) cur.scores[mid] = { ...sc, by: "openfootball", at: new Date().toISOString() };
+        }
+        // Knockout results: store match scores, then derive advancement (respecting manual overrides per round)
+        cur.koScores = cur.koScores || {};
+        const nowISO = new Date().toISOString();
+        for (const [num, ks] of Object.entries(koParsed)) {
+          cur.koScores[num] = { ...ks, by: "openfootball", at: nowISO };
+        }
+        cur.advanced = cur.advanced || {};
+        cur.advancedMeta = cur.advancedMeta || {};
+        const derived = deriveAdvancedFromKO(cur.koScores);
+        for (const rk of ["r16", "qf", "sf", "final", "champ"]) {
+          const meta = cur.advancedMeta[rk];
+          const manualLocked = meta && meta.by && meta.by !== "openfootball";
+          if (manualLocked) continue; // a commissioner edited this round by hand — leave it alone
+          if (derived[rk] && derived[rk].length) {
+            cur.advanced[rk] = derived[rk];
+            cur.advancedMeta[rk] = { by: "openfootball", at: nowISO };
+          }
         }
         cur.feedAt = new Date().toISOString();
         await sSet(K_RESULTS, cur);
@@ -550,7 +610,7 @@ export default function App() {
         ? <Join nameInput={nameInput} setNameInput={setNameInput} onJoin={joinAs} players={players} announcements={results.announcements || []} pastDeadline={pastDeadline} />
         : <PlayTab playerName={playerName} picks={picks} editable={editable} locked={locked} pastDeadline={pastDeadline} setScorePick={setScorePick} toggleAdvance={toggleAdvance} onSave={() => savePicks({ lock: false })} onLock={() => savePicks({ lock: true })} onUnlock={unlockPicks} onSwitch={() => { setPlayerId(null); setNameInput(""); }} />)}
       {tab === "tables" && <Tables qual={qual} />}
-      {tab === "bracket" && <Bracket advanced={results.advanced} />}
+      {tab === "bracket" && <Bracket advanced={results.advanced} koScores={results.koScores} />}
       {tab === "standings" && <Standings rows={standRows} autoReady={qual.allComplete} />}
       {tab === "league" && <LeaguePicks entries={leagueEntries} revealed={results.revealed} />}
       {tab === "analysis" && <Analysis editions={analysisPosts} />}
@@ -892,19 +952,21 @@ function Tables({ qual }) {
   );
 }
 
-function Bracket({ advanced }) {
+function Bracket({ advanced, koScores }) {
   const adv = advanced || {};
+  const ko = koScores || {};
   const cache = {};
   function sides(num) {
     if (cache[num]) return cache[num];
-    const m = KO_BY_NUM[num];
+    const m = KO_BY_NUM[num]; const ks = ko[num];
     let res;
     if (m.r === "r32") res = { a: { team: m.a, seed: m.as }, b: { team: m.b, seed: m.bs } };
-    else if (m.r === "third") res = { a: { team: loserOf(m.l1), ph: "Loser M" + m.l1 }, b: { team: loserOf(m.l2), ph: "Loser M" + m.l2 } };
-    else res = { a: { team: winnerOf(m.f1), ph: "Winner M" + m.f1 }, b: { team: winnerOf(m.f2), ph: "Winner M" + m.f2 } };
+    else if (m.r === "third") res = { a: { team: (ks && ks.a) || loserOf(m.l1), ph: "Loser M" + m.l1 }, b: { team: (ks && ks.b) || loserOf(m.l2), ph: "Loser M" + m.l2 } };
+    else res = { a: { team: (ks && ks.a) || winnerOf(m.f1), ph: "Winner M" + m.f1 }, b: { team: (ks && ks.b) || winnerOf(m.f2), ph: "Winner M" + m.f2 } };
     cache[num] = res; return res;
   }
   function winnerOf(num) {
+    const ks = ko[num]; if (ks && ks.winner) return ks.winner;
     const m = KO_BY_NUM[num]; const s = sides(num);
     const list = adv[KO_NEXT[m.r]] || [];
     if (s.a.team && list.includes(s.a.team)) return s.a.team;
@@ -915,6 +977,19 @@ function Bracket({ advanced }) {
     const s = sides(num); const w = winnerOf(num);
     if (!w) return null;
     return w === s.a.team ? s.b.team : w === s.b.team ? s.a.team : null;
+  }
+  function teamGoals(ks, team) {
+    if (!ks) return null;
+    const base = ks.et || ks.ft; if (!base) return null;
+    if (ks.a === team) return base[0];
+    if (ks.b === team) return base[1];
+    return null;
+  }
+  function teamPens(ks, team) {
+    if (!ks || !ks.pen) return null;
+    if (ks.a === team) return ks.pen[0];
+    if (ks.b === team) return ks.pen[1];
+    return null;
   }
   const champ = (adv.champ || [])[0] || null;
 
@@ -927,30 +1002,33 @@ function Bracket({ advanced }) {
   ];
   const roundColor = { r32: C.mute, r16: C.ink, qf: C.sun, sf: C.pitch, final: C.red };
 
-  function TeamRow({ side, winner, isR32 }) {
+  function TeamRow({ side, winner, isR32, goals, pens }) {
     const known = !!side.team;
     const isWinner = winner && side.team === winner;
     return (
       <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 7px", background: isWinner ? "#E4F0E8" : "transparent", borderRadius: 3 }}>
         {isR32 && <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", color: C.chalk, background: C.ink, borderRadius: 2, padding: "1px 4px", flexShrink: 0 }}>{side.seed}</span>}
-        <span style={{ fontSize: 12.5, fontWeight: isWinner ? 700 : known ? 600 : 400, color: known ? C.ink : C.mute, fontStyle: known ? "normal" : "italic", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        <span style={{ flex: 1, fontSize: 12.5, fontWeight: isWinner ? 700 : known ? 600 : 400, color: known ? C.ink : C.mute, fontStyle: known ? "normal" : "italic", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {known ? side.team : side.ph}
         </span>
+        {goals != null && <span style={{ fontSize: 12.5, fontFamily: "'DM Mono', monospace", fontWeight: isWinner ? 700 : 600, color: C.ink, flexShrink: 0 }}>{goals}{pens != null ? ` (${pens})` : ""}</span>}
       </div>
     );
   }
   function MatchCard({ num }) {
-    const m = KO_BY_NUM[num]; const s = sides(num);
-    const w = m.r === "third" ? null : winnerOf(num);
+    const m = KO_BY_NUM[num]; const s = sides(num); const ks = ko[num];
+    const w = winnerOf(num);
     const isR32 = m.r === "r32";
+    const decided = ks && (ks.pen || (ks.et && ks.ft && (ks.et[0] !== ks.ft[0] || ks.et[1] !== ks.ft[1])));
     return (
       <div style={{ background: C.chalk, border: `1px solid ${C.line}`, borderLeft: `3px solid ${roundColor[m.r] || C.mute}`, borderRadius: 5, padding: "5px 6px", width: 168, flexShrink: 0 }}>
         <div style={{ fontSize: 9.5, color: C.mute, fontFamily: "'DM Mono', monospace", marginBottom: 3, lineHeight: 1.3 }}>
           M{m.n} · {m.et}<br />{m.v}
         </div>
-        <TeamRow side={s.a} winner={w} isR32={isR32} />
+        <TeamRow side={s.a} winner={w} isR32={isR32} goals={teamGoals(ks, s.a.team)} pens={teamPens(ks, s.a.team)} />
         <div style={{ height: 1, background: C.line, margin: "1px 0" }} />
-        <TeamRow side={s.b} winner={w} isR32={isR32} />
+        <TeamRow side={s.b} winner={w} isR32={isR32} goals={teamGoals(ks, s.b.team)} pens={teamPens(ks, s.b.team)} />
+        {decided && <div style={{ fontSize: 9, color: C.mute, fontFamily: "'DM Mono', monospace", marginTop: 2, textAlign: "right" }}>{ks.pen ? "won on penalties" : "after extra time"}</div>}
       </div>
     );
   }
@@ -1150,7 +1228,24 @@ function Results({ results, setScore, toggleResultAdvance, qual, setManualOrder,
             <div>SF: {(results.advanced.sf || []).map(abbr).join(" ") || "—"}</div>
             <div>Final: {(results.advanced.final || []).map(abbr).join(" ") || "—"} · Champ: {(results.advanced.champ || []).map(abbr).join(" ") || "—"}</div>
           </div>
-          <p style={{ fontSize: 12.5, color: C.mute, lineHeight: 1.5, marginTop: 0 }}>Round of 32 fills automatically from group scores once all groups are complete{qual.allComplete ? " — done ✓" : " (not yet)"}. Enter who reaches the later rounds here as the knockouts play out.</p>
+          {(() => {
+            const ks = results.koScores || {};
+            const played = KNOCKOUT.filter((m) => ks[m.n]);
+            if (!played.length) return null;
+            return (
+              <div style={{ border: `1px solid ${C.line}`, borderRadius: 3, padding: "10px 12px", marginBottom: 14 }}>
+                <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 6 }}>Knockout results (auto-fed)</div>
+                {played.map((m) => { const k = ks[m.n]; const rt = koResultText(k); const wname = k.winner;
+                  return (
+                    <div key={m.n} style={{ fontSize: 11.5, fontFamily: "'DM Mono', monospace", lineHeight: 1.7 }}>
+                      M{m.n} {k.a} {rt} {k.b} {wname && <span style={{ color: C.pitch, fontWeight: 700 }}>→ {wname}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+          <p style={{ fontSize: 12.5, color: C.mute, lineHeight: 1.5, marginTop: 0 }}>Round of 32 fills automatically from group scores once all groups are complete{qual.allComplete ? " — done ✓" : " (not yet)"}. Later rounds now auto-fill from the live feed (including extra time and penalties). You can still tap below to override a round manually — a manual edit takes precedence over the feed for that round.</p>
           {ROUNDS.filter((r) => r.key !== "r32").map((r) => {
             const chosen = new Set(results.advanced[r.key] || []); const meta = results.advancedMeta[r.key];
             return (
