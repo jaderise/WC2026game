@@ -446,6 +446,12 @@ async function main() {
 
   let newEdition;
   if (editionArg === "round3") {
+    // Freeze knockout advancement empty — this edition is the moment the groups finished,
+    // so standings movement reflects group points + Round-of-32 points only.
+    const r3snapshot = {
+      playerPicks: snapPicks,
+      results: { scores: filteredScores, advanced: { r32: [], r16: [], qf: [], sf: [], final: [], champ: [] } },
+    };
     newEdition = {
       id: "round3",
       title: "Round 3 — The Groups Are Settled",
@@ -457,8 +463,9 @@ async function main() {
       movementLabel: "Round 2 → Round 3",
       movementFrom: "Round 2",
       movementTo: "Round 3",
-      cards: ["matchday", "standings-movement", "consensus"],
-      snapshot,
+      includeR32: true,
+      cards: ["matchday", "standings-movement", "knockout-preview", "consensus"],
+      snapshot: r3snapshot,
     };
   } else if (editionArg === "round2") {
     newEdition = {

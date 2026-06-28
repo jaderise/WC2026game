@@ -1522,7 +1522,7 @@ function Analysis({ editions }) {
     );
   }
 
-  function renderStandingsMovement(prevEdition, curEdition, names, movementLabel, movementFrom, movementTo) {
+  function renderStandingsMovement(prevEdition, curEdition, names, movementLabel, movementFrom, movementTo, includeR32) {
     const prevPicks = prevEdition.snapshot.playerPicks;
     const prevResults = prevEdition.snapshot.results;
     const curPicks = curEdition.snapshot.playerPicks;
@@ -1530,43 +1530,41 @@ function Analysis({ editions }) {
     const prevScores = prevResults.scores || {};
     const curScores = curResults.scores || {};
 
-    const prevAccuracy = names.map((name) => {
+    function groupCorrect(picks, scores) {
       let c = 0;
-      const pp = prevPicks[name];
-      if (!pp) return { name, correct: 0 };
-      for (const mm of MATCHES.filter((m) => prevScores[m.m] && prevScores[m.m].hg != null)) {
-        const s = (pp.scores || {})[mm.m];
-        if (predOutcome(s) === predOutcome(prevScores[mm.m])) c++;
+      if (!picks) return 0;
+      for (const mm of MATCHES.filter((m) => scores[m.m] && scores[m.m].hg != null)) {
+        const s = (picks.scores || {})[mm.m];
+        if (predOutcome(s) === predOutcome(scores[mm.m])) c++;
       }
-      return { name, correct: c };
-    }).sort((a, b) => b.correct - a.correct);
-
-    const curAccuracy = names.map((name) => {
-      let c = 0;
-      const cp = curPicks[name];
-      if (!cp) return { name, correct: 0 };
-      for (const mm of MATCHES.filter((m) => curScores[m.m] && curScores[m.m].hg != null)) {
-        const s = (cp.scores || {})[mm.m];
-        if (predOutcome(s) === predOutcome(curScores[mm.m])) c++;
+      return c;
+    }
+    // In R32 mode we rank by total points (group×1 + R32×2) via the real scoring engine,
+    // so the board matches the app's Standings tab. Otherwise rank by group outcomes correct.
+    function valueFor(picks, results, scores) {
+      if (!picks) return { value: 0, group: 0, r32: 0 };
+      if (includeR32) {
+        const sc = scorePlayer(picks, results);
+        return { value: sc.total, group: sc.breakdown.group || 0, r32: sc.breakdown.r32 || 0 };
       }
-      return { name, correct: c };
-    }).sort((a, b) => b.correct - a.correct);
+      const g = groupCorrect(picks, scores);
+      return { value: g, group: g, r32: 0 };
+    }
 
-    const prevRank = {};
-    prevAccuracy.forEach((a, i) => { prevRank[a.name] = i + 1; });
-    const curRank = {};
-    curAccuracy.forEach((a, i) => { curRank[a.name] = i + 1; });
+    const prevList = names.map((name) => ({ name, ...valueFor(prevPicks[name], prevResults, prevScores) })).sort((a, b) => b.value - a.value);
+    const curList = names.map((name) => ({ name, ...valueFor(curPicks[name], curResults, curScores) })).sort((a, b) => b.value - a.value);
+
+    const prevRank = {}; prevList.forEach((a, i) => { prevRank[a.name] = i + 1; });
+    const curRank = {}; curList.forEach((a, i) => { curRank[a.name] = i + 1; });
 
     const movers = names.map((name) => {
       const pr = prevRank[name] || names.length;
       const cr = curRank[name] || names.length;
-      const prevC = prevAccuracy.find((a) => a.name === name)?.correct || 0;
-      const curC = curAccuracy.find((a) => a.name === name)?.correct || 0;
-      return { name, prevRank: pr, curRank: cr, change: pr - cr, prevCorrect: prevC, curCorrect: curC };
+      return { name, prevRank: pr, curRank: cr, change: pr - cr };
     }).sort((a, b) => b.change - a.change);
-
     const climbers = movers.filter((m) => m.change > 0);
     const fallers = movers.filter((m) => m.change < 0).sort((a, b) => a.change - b.change);
+    const unit = includeR32 ? "pts" : "correct";
 
     return (
       <div style={cardStyle}>
@@ -1575,32 +1573,128 @@ function Analysis({ editions }) {
           <span style={tagStyle(C.pitch)}>MOVEMENT</span>
         </div>
         <h2 style={h2Style}>WHO'S CLIMBING, WHO'S SLIDING?</h2>
-        <p style={{ fontSize: 12, color: C.mute, fontFamily: "'DM Mono', monospace", margin: "4px 0 14px" }}>Group stage accuracy rankings: {movementLabel || `${movementFrom || "Round 1"} → ${movementTo || "Round 2"}`}</p>
+        <p style={{ fontSize: 12, color: C.mute, fontFamily: "'DM Mono', monospace", margin: "4px 0 14px" }}>{includeR32 ? "Total points (group + Round of 32)" : "Group stage accuracy"}: {movementLabel || `${movementFrom || "Round 1"} → ${movementTo || "Round 2"}`}</p>
 
         <p style={pStyle}>
-          After {movementTo || "Round 2"}, the accuracy table has shuffled.
+          {includeR32
+            ? `The final group games are in and the Round-of-32 points (2 per correct team) have landed — so this is the real board now, group picks and bracket combined. `
+            : ""}
+          After {movementTo || "Round 2"}, the table has shuffled.
           {climbers.length > 0 && ` ${climbers[0].name} made the biggest move, climbing ${climbers[0].change} spot${climbers[0].change > 1 ? "s" : ""} from #${climbers[0].prevRank} to #${climbers[0].curRank}.`}
           {fallers.length > 0 && ` ${fallers[0].name} took the biggest tumble, dropping ${Math.abs(fallers[0].change)} spot${Math.abs(fallers[0].change) > 1 ? "s" : ""}.`}
         </p>
 
-        {curAccuracy.map((a) => {
+        {curList.map((a, i) => {
           const m = movers.find((x) => x.name === a.name);
           const ch = m ? m.change : 0;
           const arrow = ch > 0 ? "▲" : ch < 0 ? "▼" : "—";
           const arrowColor = ch > 0 ? C.pitch : ch < 0 ? C.red : C.mute;
           return (
             <div key={a.name} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: `1px solid ${C.line}` }}>
-              <div style={{ width: 28, fontWeight: 700, fontSize: 16, fontFamily: "Anton, sans-serif", textAlign: "center", color: C.ink }}>
-                {curAccuracy.indexOf(a) + 1}
-              </div>
+              <div style={{ width: 28, fontWeight: 700, fontSize: 16, fontFamily: "Anton, sans-serif", textAlign: "center", color: C.ink }}>{i + 1}</div>
               <div style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{a.name}</div>
-              <div style={{ fontSize: 12, color: C.mute, fontFamily: "'DM Mono', monospace" }}>{a.correct} correct</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: arrowColor, width: 50, textAlign: "right" }}>
+              <div style={{ fontSize: 12, color: C.mute, fontFamily: "'DM Mono', monospace", textAlign: "right" }}>
+                {a.value} {unit}{includeR32 ? <span style={{ color: C.pitch }}> · {a.group}g+{a.r32}r32</span> : null}
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: arrowColor, width: 46, textAlign: "right" }}>
                 {arrow} {ch !== 0 ? Math.abs(ch) : ""}
               </div>
             </div>
           );
         })}
+      </div>
+    );
+  }
+
+  function renderKnockoutPreview(playerPicks, results, names) {
+    const q = computeQualifiers(results.scores || {}, results.manualOrder || {}, results.manualThird || []);
+    const r32 = new Set(q.allComplete ? q.r32 : []);
+    const inRound = (team, rk) => names.filter((n) => (playerPicks[n].advanced?.[rk] || []).includes(team)).length;
+
+    // Champion survival + bracket intactness
+    const champRows = names.map((n) => {
+      const adv = playerPicks[n].advanced || {};
+      const champ = (adv.champ || [])[0] || null;
+      const sf = adv.sf || [];
+      const sfAlive = sf.filter((t) => r32.has(t)).length;
+      return { name: n, champ, champAlive: champ ? r32.has(champ) : null, sfTotal: sf.length, sfAlive };
+    });
+    const champAlive = champRows.filter((r) => r.champAlive === true);
+    const champOut = champRows.filter((r) => r.champAlive === false);
+    const fullyIntact = champRows.filter((r) => r.sfTotal === 4 && r.sfAlive === 4 && r.champAlive === true);
+
+    // Deep casualties: SF-or-better picks eliminated in the group stage
+    const casualties = [];
+    for (const n of names) {
+      const adv = playerPicks[n].advanced || {};
+      const champ = (adv.champ || [])[0];
+      const dead = [];
+      for (const t of (adv.sf || [])) {
+        if (!r32.has(t)) dead.push({ team: t, level: champ === t ? "Champion" : (adv.final || []).includes(t) ? "Finalist" : "Semifinalist" });
+      }
+      if (dead.length) dead.sort((a, b) => ({ Champion: 0, Finalist: 1, Semifinalist: 2 }[a.level] - { Champion: 0, Finalist: 1, Semifinalist: 2 }[b.level]));
+      if (dead.length) casualties.push({ name: n, dead });
+    }
+    casualties.sort((a, b) => (a.dead[0].level === "Champion" ? -1 : 1) - (b.dead[0].level === "Champion" ? -1 : 1) || b.dead.length - a.dead.length);
+
+    // R32 collisions: matchups that guarantee a popular pick goes home
+    const collisions = KNOCKOUT.filter((m) => m.r === "r32").map((m) => {
+      const a = m.a, b = m.b;
+      const both = names.filter((n) => { const r16 = playerPicks[n].advanced?.r16 || []; return r16.includes(a) && r16.includes(b); }).length;
+      const aR16 = inRound(a, "r16"), bR16 = inRound(b, "r16");
+      const aDeep = inRound(a, "sf"), bDeep = inRound(b, "sf");
+      return { m, a, b, both, aR16, bR16, aDeep, bDeep, heat: both * 3 + Math.min(aR16, bR16) + (aDeep + bDeep) };
+    }).filter((c) => c.aR16 > 0 && c.bR16 > 0).sort((x, y) => y.heat - x.heat).slice(0, 6);
+
+    return (
+      <div style={cardStyle}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+          <span style={tagStyle(C.ink)}>KNOCKOUTS</span>
+          <span style={tagStyle(C.red)}>PREVIEW</span>
+        </div>
+        <h2 style={h2Style}>THE BRACKET SURVIVORS</h2>
+        <p style={{ fontSize: 12, color: C.mute, fontFamily: "'DM Mono', monospace", margin: "4px 0 14px" }}>Whose knockout picks made it out of the groups — and the collisions ahead</p>
+
+        <p style={pStyle}>
+          The 32 survivors are set. Time to check the damage: {champAlive.length} of {names.length} players still have their champion pick alive, {champOut.length} watched theirs crash out before the knockouts even began
+          {fullyIntact.length > 0 ? `, and ${fullyIntact.length} ${fullyIntact.length > 1 ? "brackets are" : "bracket is"} still fully intact (champion + all four semifinalists through).` : "."}
+        </p>
+
+        <h3 style={h3Style}>TITLE PICKS — STILL ALIVE?</h3>
+        {champRows.filter((r) => r.champ).sort((a, b) => (b.champAlive === true) - (a.champAlive === true) || b.sfAlive - a.sfAlive).map((r) => (
+          <div key={r.name} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0", borderBottom: `1px solid ${C.line}` }}>
+            <div style={{ width: 22, height: 22, borderRadius: "50%", background: r.champAlive ? C.pitch : C.red, color: C.chalk, fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{r.champAlive ? "✓" : "✗"}</div>
+            <div style={{ flex: 1, fontSize: 13 }}><span style={{ fontWeight: 700 }}>{r.name}</span> — {r.champ}</div>
+            <div style={{ fontSize: 11, color: C.mute, fontFamily: "'DM Mono', monospace" }}>{r.sfAlive}/{r.sfTotal} SF alive</div>
+          </div>
+        ))}
+
+        {casualties.length > 0 && (<>
+          <h3 style={h3Style}>GONE TOO SOON</h3>
+          <p style={pStyle}>Teams backed to reach the semifinals or further that didn't even survive the group stage — points that can never be scored.</p>
+          {casualties.map((c) => (
+            <div key={c.name} style={{ padding: "6px 0", borderBottom: `1px solid ${C.line}`, fontSize: 13 }}>
+              <span style={{ fontWeight: 700 }}>{c.name}</span>: {c.dead.map((d, i) => (
+                <span key={i}>{i > 0 ? ", " : " "}<span style={{ color: C.red, fontWeight: 600 }}>{d.team}</span> <span style={{ fontSize: 11, color: C.mute }}>({d.level})</span></span>
+              ))}
+            </div>
+          ))}
+        </>)}
+
+        <h3 style={h3Style}>COLLISION COURSE</h3>
+        <p style={pStyle}>
+          The Round of 32 draw forces some popular teams to meet early — and only one can survive. These matchups are guaranteed to knock out a team plenty of brackets are counting on.
+        </p>
+        {collisions.map((c) => (
+          <div key={c.m.n} style={{ background: C.paper, borderRadius: 6, padding: "10px 12px", marginBottom: 8, borderLeft: `4px solid ${C.red}` }}>
+            <div style={{ fontSize: 14, fontWeight: 700 }}>{c.a} <span style={{ color: C.red }}>vs</span> {c.b}</div>
+            <div style={{ fontSize: 11.5, color: C.mute, fontFamily: "'DM Mono', monospace", marginTop: 2 }}>M{c.m.n} · {c.m.et}</div>
+            <div style={{ fontSize: 12.5, color: C.ink, marginTop: 4, lineHeight: 1.5 }}>
+              {c.both > 0 && <><b>{c.both}</b> {c.both > 1 ? "brackets" : "bracket"} picked <b>both</b> to reach the Round of 16 — guaranteed to lose one. </>}
+              {c.a} backed by {c.aR16} to reach the R16{c.aDeep > 0 ? ` (${c.aDeep} to the semis+)` : ""}; {c.b} by {c.bR16}{c.bDeep > 0 ? ` (${c.bDeep} to the semis+)` : ""}.
+            </div>
+          </div>
+        ))}
       </div>
     );
   }
@@ -2046,10 +2140,13 @@ function Analysis({ editions }) {
                   return <React.Fragment key={ci}>{renderMatchdayReport(playerPicks, actualScores, names, roundMatches, roundPlayed, edition.roundLabel || "First round", edition.tagLabel || "MATCHDAY 1-2", edition.headline || "THE CRYSTAL BALL IS CRACKED")}</React.Fragment>;
                 }
                 if (card === "standings-movement" && idx < editions.length - 1) {
-                  return <React.Fragment key={ci}>{renderStandingsMovement(editions[idx + 1], edition, names, edition.movementLabel, edition.movementFrom, edition.movementTo)}</React.Fragment>;
+                  return <React.Fragment key={ci}>{renderStandingsMovement(editions[idx + 1], edition, names, edition.movementLabel, edition.movementFrom, edition.movementTo, edition.includeR32)}</React.Fragment>;
                 }
                 if (card === "knockout-vision") {
                   return <React.Fragment key={ci}>{renderKnockoutVision(playerPicks, names)}</React.Fragment>;
+                }
+                if (card === "knockout-preview") {
+                  return <React.Fragment key={ci}>{renderKnockoutPreview(playerPicks, snapResults, names)}</React.Fragment>;
                 }
                 if (card === "consensus") {
                   const matchRange = edition.matchRange || [1, 24];
