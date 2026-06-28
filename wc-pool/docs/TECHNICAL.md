@@ -99,7 +99,11 @@ const docId = (key) => key.replaceAll(":", "__");
       "champ": []
     },
     "advancedMeta": {
-      "r16": { "by": "Jason", "at": "..." }
+      "r16": { "by": "openfootball", "at": "..." }
+    },
+    "koScores": {
+      "73": { "a": "South Africa", "b": "Canada", "ft": [2, 0], "et": null, "pen": null, "winner": "South Africa", "by": "openfootball", "at": "..." },
+      "75": { "a": "Netherlands", "b": "Morocco", "ft": [1, 1], "et": [1, 1], "pen": [4, 2], "winner": "Netherlands", "by": "openfootball", "at": "..." }
     },
     "manualOrder": {
       "A": ["Mexico", "South Korea", "Czechia", "South Africa"]
@@ -258,14 +262,22 @@ function liveSubscribe(onChange) {
 
 ## Auto-Feed Pipeline
 
+The same feed drives both the group stage (matches 1–72) and the knockout stage (matches 73–104).
+
 ```
 openfootball/worldcup.json (GitHub raw)
     ↓ fetch every 15 min
-parseFeedScores(json)
-    ↓ normalize team names via FEED_ALIASES
-    ↓ look up match ID via matchByTeams index
-    ↓ skip if manual entry exists (by !== "openfootball")
-    ↓ merge into results.scores
+    ├─ parseFeedScores(json)        → group matches 1–72
+    │     ↓ normalize team names via FEED_ALIASES
+    │     ↓ look up match ID via matchByTeams index
+    │     ↓ skip if manual entry exists (by !== "openfootball")
+    │     ↓ merge into results.scores
+    └─ parseFeedKnockout(json)      → knockout matches 73–104
+          ↓ normalize team names; skip unresolved placeholder slots
+          ↓ determine winner: penalties → extra time → full time
+          ↓ store match result in results.koScores[num]
+          ↓ deriveAdvancedFromKO() → results.advanced (R16…Champion)
+          ↓ skip any round a human edited (advancedMeta.by !== "openfootball")
 sSet(K_RESULTS, updatedResults)
 ```
 
@@ -288,10 +300,18 @@ const FEED_ALIASES = {
 };
 ```
 
-**Merge Rules:**
+**Merge Rules (group stage):**
 - Feed scores include `by: "openfootball"` metadata
 - If a score already exists with `by` set to something other than `"openfootball"`, the feed does not overwrite it (manual entries take priority)
 - Feed updates `feedAt` timestamp on each sync
+
+**Knockout Rules (matches 73–104):**
+- `parseFeedKnockout` reads only matches numbered 73–104 that have a final-time score and two resolved team names (placeholder slots like `3A/B/C/D/F` or `W74` are skipped until the feed fills them in)
+- Winner is decided by `koWinnerFromScore`: penalty shootout (`score.p`) → after extra time (`score.et`) → full time (`score.ft`)
+- Each result is stored in `results.koScores[num]` as `{ a, b, ft, et, pen, winner, by, at }`
+- `deriveAdvancedFromKO(koScores)` walks the `KNOCKOUT` bracket and collects winners into `results.advanced` (R32 winners → `r16`, R16 winners → `qf`, … Final winner → `champ`), which drives live scoring and the Bracket/Standings tabs
+- **Manual override per round:** if a round's `advancedMeta[round].by` is a human (not `"openfootball"`), the feed leaves that round untouched, so a hand correction is never clobbered
+- R32 *qualification* is still computed from group standings (`computeQualifiers`), independent of `koScores`; the knockout feed only governs R16 onward
 
 ---
 
@@ -362,6 +382,7 @@ Only the outcome matters (H/D/A), not the exact score.
 | `GroupPicks` | picks, editable, setScorePick, myR32info | 72-match score prediction grid |
 | `KnockoutPicks` | picks, editable, toggleAdvance, myR32info | Knockout round team picker |
 | `Tables` | qual | Live group standings display |
+| `Bracket` | advanced, koScores | March Madness–style knockout bracket (R32 locked from group tables; later rounds + scores auto-fill from the feed) |
 | `Standings` | rows, autoReady | Player leaderboard |
 | `LeaguePicks` | entries, revealed | All players' brackets viewer |
 | `Updates` | announcements, onPost, onDelete, isCommissioner | Announcement board |
@@ -397,7 +418,7 @@ All state lives in the root `App` component via `useState`. No external state li
 | `nameInput` | string | Join form input |
 | `picks` | object | Current player's predictions |
 | `locked` | boolean | Whether current player's picks are locked |
-| `results` | object | Full tournament state (scores, advanced, flags, announcements) |
+| `results` | object | Full tournament state (group scores, knockout `koScores`, derived `advanced`, flags, announcements) |
 | `players` | object | Registry mapping player IDs to display names |
 | `loading` | boolean | Initial data load state |
 | `toast` | string | Flash message text |
@@ -511,6 +532,17 @@ const ROUNDS = [
   { key: "champ", label: "Champion",    count: 1,  pts: 21 },
 ];
 ```
+
+### Knockout Bracket
+`KNOCKOUT` is a 32-entry array (matches 73–104) defining the bracket tree, locked once the groups completed. Round-of-32 entries carry real teams and group-seed labels; later rounds carry feeder match numbers, resolved to real teams as results arrive. Times are pre-converted to US Eastern.
+```javascript
+// R32 — real teams + seed labels (1E = Group E winner, 3D = Group D third place)
+{ n: 74, r: "r32", et: "Mon Jun 29, 4:30 PM ET", v: "Boston", a: "Germany", as: "1E", b: "Paraguay", bs: "3D" }
+// later rounds — feeder match numbers (winners of f1 / f2)
+{ n: 89, r: "r16", et: "Sat Jul 4, 5:00 PM ET", v: "Philadelphia", f1: 74, f2: 77 }
+{ n: 103, r: "third", ..., l1: 101, l2: 102 }   // losers of the two semifinals
+```
+Helpers: `KO_NEXT` maps each round to the round its winners reach (`r32→r16`, … `final→champ`); `KO_BY_NUM` indexes `KNOCKOUT` by match number.
 
 ### Deadline
 ```javascript

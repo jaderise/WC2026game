@@ -68,7 +68,17 @@ Displays the current actual group standings computed from entered match results.
 - Third-place teams in contention for the best-8 spots are highlighted in amber
 - When all group matches are complete, the full Round of 32 field is displayed
 
-### Tab 3: Standings
+### Tab 3: Bracket
+
+A March Madness–style visual of the entire knockout stage, available once the group stage is complete.
+
+- **Round of 32** is locked from the final group tables — all 16 matchups show real teams with their **group-seed label** (e.g., `1E` = Group E winner, `3D` = Group D third place), the **date and kickoff time in US Eastern**, and the **venue**
+- **R16 → Final** render as a horizontally-scrollable bracket tree; each slot shows a "Winner of M—" placeholder until that match is decided, then fills in the actual team
+- As knockout results arrive (via the auto-feed or a manual override), each match card shows the **score and the winner** (highlighted), including annotations for **extra time** ("after extra time") and **penalty shootouts** ("won on penalties", with the shootout score in parentheses)
+- The **third-place playoff** is shown beneath the main bracket
+- A **Champion banner** appears at the top once the Final is decided
+
+### Tab 4: Standings
 
 The live leaderboard showing all players ranked by total points.
 
@@ -76,7 +86,7 @@ The live leaderboard showing all players ranked by total points.
 - Expandable breakdown shows points earned in each category: Group, R32, R16, QF, SF, Final, Champion
 - Scores update in real time via Firestore live sync — when a result is entered, all connected clients see updated standings immediately
 
-### Tab 4: League Picks
+### Tab 5: League Picks
 
 Shows every player's full bracket, allowing comparison across the pool.
 
@@ -88,7 +98,7 @@ Shows every player's full bracket, allowing comparison across the pool.
   - All 72 group stage score predictions
 - When hidden, displays "PICKS ARE SECRET" message
 
-### Tab 5: Analysis
+### Tab 6: Analysis
 
 A blog-style analytics page with data visualizations and narratives about the pool's collective predictions. Analysis is organized into **editions** (e.g., Round 1, Round 2), each rendered from a **frozen snapshot** saved to Firestore so the analysis doesn't change as new match results come in. New editions are created by running `analytics.mjs` with a round argument.
 
@@ -137,7 +147,7 @@ The latest edition is fully expanded at the top of the page. Older editions coll
 
 Analysis by Claude is credited on the page.
 
-### Tab 6: Updates
+### Tab 7: Updates
 
 A simple announcements board for commissioner-to-player communication.
 
@@ -146,7 +156,7 @@ A simple announcements board for commissioner-to-player communication.
 - Commissioner can delete individual messages
 - Messages also appear on the Join/welcome screen so returning players see them immediately
 
-### Tab 7: Results
+### Tab 8: Results
 
 The commissioner's scoring and tournament management interface. Only accessible after entering a name on the My Picks tab.
 
@@ -161,8 +171,9 @@ The commissioner's scoring and tournament management interface. Only accessible 
 - Similarly for third-place teams competing for the final Round of 32 spots
 
 **Knockout Advancement**
-- Commissioner selects which teams actually advanced to each knockout round
-- Rounds available: R16, QF, SF, Final, Champion
+- The **Round of 32** fills automatically from the completed group tables (top 2 per group + best 8 third-place teams)
+- **R16 → Champion now fill in automatically from the auto-feed** as knockout matches are played — including matches decided in extra time or on penalties. A "Knockout results (auto-fed)" readout lists each played match with its score and winner.
+- The commissioner can still tap teams to **override a round manually**; a manual edit takes precedence over the feed for that round (the feed won't overwrite it)
 
 **Commissioner Controls** (located at the bottom of the Results tab)
 - **Open/Close Editing** — temporarily allows all players to modify their picks after the deadline (used for corrections)
@@ -244,7 +255,8 @@ The app automatically fetches live match scores from the openfootball project on
 
 - **Source:** `openfootball/worldcup.json` repository on GitHub (raw JSON)
 - **Frequency:** Every 15 minutes + on app load
-- **Merge logic:** Feed scores are only applied if no manual score exists for that match. Manual entries (identified by the `by` field) are never overwritten.
+- **Group stage:** Feed scores are only applied if no manual score exists for that match. Manual entries (identified by the `by` field) are never overwritten.
+- **Knockout stage:** The feed also ingests the knockout matches (Round of 32 through Final). For each played match it determines the winner — handling **extra time and penalty shootouts** — and automatically advances that team. This flows straight into the Bracket, Standings, and Results tabs with no manual entry. A commissioner can still override any round by hand, and the feed will respect that override.
 - **Team name normalization:** The feed uses different team names (e.g., "United States" vs "USA", "Côte d'Ivoire" vs "Ivory Coast"), which are mapped via an alias table
 - **Status indicator:** The header shows "auto-feed synced Xm ago" or "auto-feed offline" if the fetch fails
 
