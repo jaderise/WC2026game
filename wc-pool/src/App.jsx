@@ -120,6 +120,47 @@ const ROUNDS = [
 ];
 const GROUP_MATCH_PTS = 1;
 const DEADLINE_ISO = "2026-06-11T19:00:00Z";
+
+/* Knockout bracket — R32 matchups locked once groups completed.
+   R32 carries real teams + group-seed labels; later rounds carry feeder match nums (f1/f2),
+   resolved to actual teams from results.advanced as the commissioner sets advancement.
+   Times converted to US Eastern (EDT). */
+const KNOCKOUT = [
+  { n: 73, r: "r32", et: "Sun Jun 28, 3:00 PM ET", v: "Los Angeles", a: "South Africa", as: "2A", b: "Canada", bs: "2B" },
+  { n: 74, r: "r32", et: "Mon Jun 29, 4:30 PM ET", v: "Boston", a: "Germany", as: "1E", b: "Paraguay", bs: "3D" },
+  { n: 75, r: "r32", et: "Mon Jun 29, 9:00 PM ET", v: "Monterrey", a: "Netherlands", as: "1F", b: "Morocco", bs: "2C" },
+  { n: 76, r: "r32", et: "Mon Jun 29, 1:00 PM ET", v: "Houston", a: "Brazil", as: "1C", b: "Japan", bs: "2F" },
+  { n: 77, r: "r32", et: "Tue Jun 30, 5:00 PM ET", v: "New York/New Jersey", a: "France", as: "1I", b: "Sweden", bs: "3F" },
+  { n: 78, r: "r32", et: "Tue Jun 30, 1:00 PM ET", v: "Dallas", a: "Ivory Coast", as: "2E", b: "Norway", bs: "2I" },
+  { n: 79, r: "r32", et: "Tue Jun 30, 9:00 PM ET", v: "Mexico City", a: "Mexico", as: "1A", b: "Ecuador", bs: "3E" },
+  { n: 80, r: "r32", et: "Wed Jul 1, 12:00 PM ET", v: "Atlanta", a: "England", as: "1L", b: "DR Congo", bs: "3K" },
+  { n: 81, r: "r32", et: "Wed Jul 1, 8:00 PM ET", v: "San Francisco Bay Area", a: "USA", as: "1D", b: "Bosnia and Herzegovina", bs: "3B" },
+  { n: 82, r: "r32", et: "Wed Jul 1, 4:00 PM ET", v: "Seattle", a: "Belgium", as: "1G", b: "Senegal", bs: "3I" },
+  { n: 83, r: "r32", et: "Thu Jul 2, 7:00 PM ET", v: "Toronto", a: "Portugal", as: "2K", b: "Croatia", bs: "2L" },
+  { n: 84, r: "r32", et: "Thu Jul 2, 3:00 PM ET", v: "Los Angeles", a: "Spain", as: "1H", b: "Austria", bs: "2J" },
+  { n: 85, r: "r32", et: "Thu Jul 2, 11:00 PM ET", v: "Vancouver", a: "Switzerland", as: "1B", b: "Algeria", bs: "3J" },
+  { n: 86, r: "r32", et: "Fri Jul 3, 6:00 PM ET", v: "Miami", a: "Argentina", as: "1J", b: "Cape Verde", bs: "2H" },
+  { n: 87, r: "r32", et: "Fri Jul 3, 9:30 PM ET", v: "Kansas City", a: "Colombia", as: "1K", b: "Ghana", bs: "3L" },
+  { n: 88, r: "r32", et: "Fri Jul 3, 2:00 PM ET", v: "Dallas", a: "Australia", as: "2D", b: "Egypt", bs: "2G" },
+  { n: 89, r: "r16", et: "Sat Jul 4, 5:00 PM ET", v: "Philadelphia", f1: 74, f2: 77 },
+  { n: 90, r: "r16", et: "Sat Jul 4, 1:00 PM ET", v: "Houston", f1: 73, f2: 75 },
+  { n: 91, r: "r16", et: "Sun Jul 5, 4:00 PM ET", v: "New York/New Jersey", f1: 76, f2: 78 },
+  { n: 92, r: "r16", et: "Sun Jul 5, 8:00 PM ET", v: "Mexico City", f1: 79, f2: 80 },
+  { n: 93, r: "r16", et: "Mon Jul 6, 3:00 PM ET", v: "Dallas", f1: 83, f2: 84 },
+  { n: 94, r: "r16", et: "Mon Jul 6, 8:00 PM ET", v: "Seattle", f1: 81, f2: 82 },
+  { n: 95, r: "r16", et: "Tue Jul 7, 12:00 PM ET", v: "Atlanta", f1: 86, f2: 88 },
+  { n: 96, r: "r16", et: "Tue Jul 7, 4:00 PM ET", v: "Vancouver", f1: 85, f2: 87 },
+  { n: 97, r: "qf", et: "Thu Jul 9, 4:00 PM ET", v: "Boston", f1: 89, f2: 90 },
+  { n: 98, r: "qf", et: "Fri Jul 10, 3:00 PM ET", v: "Los Angeles", f1: 93, f2: 94 },
+  { n: 99, r: "qf", et: "Sat Jul 11, 5:00 PM ET", v: "Miami", f1: 91, f2: 92 },
+  { n: 100, r: "qf", et: "Sat Jul 11, 9:00 PM ET", v: "Kansas City", f1: 95, f2: 96 },
+  { n: 101, r: "sf", et: "Tue Jul 14, 3:00 PM ET", v: "Dallas", f1: 97, f2: 98 },
+  { n: 102, r: "sf", et: "Wed Jul 15, 3:00 PM ET", v: "Atlanta", f1: 99, f2: 100 },
+  { n: 103, r: "third", et: "Sat Jul 18, 5:00 PM ET", v: "Miami", l1: 101, l2: 102 },
+  { n: 104, r: "final", et: "Sun Jul 19, 3:00 PM ET", v: "New York/New Jersey", f1: 101, f2: 102 },
+];
+const KO_NEXT = { r32: "r16", r16: "qf", qf: "sf", sf: "final", final: "champ" };
+const KO_BY_NUM = Object.fromEntries(KNOCKOUT.map((m) => [m.n, m]));
 const FEED_URL = "https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json";
 const FETCH_INTERVAL_MS = 15 * 60 * 1000;
 
@@ -509,6 +550,7 @@ export default function App() {
         ? <Join nameInput={nameInput} setNameInput={setNameInput} onJoin={joinAs} players={players} announcements={results.announcements || []} pastDeadline={pastDeadline} />
         : <PlayTab playerName={playerName} picks={picks} editable={editable} locked={locked} pastDeadline={pastDeadline} setScorePick={setScorePick} toggleAdvance={toggleAdvance} onSave={() => savePicks({ lock: false })} onLock={() => savePicks({ lock: true })} onUnlock={unlockPicks} onSwitch={() => { setPlayerId(null); setNameInput(""); }} />)}
       {tab === "tables" && <Tables qual={qual} />}
+      {tab === "bracket" && <Bracket advanced={results.advanced} />}
       {tab === "standings" && <Standings rows={standRows} autoReady={qual.allComplete} />}
       {tab === "league" && <LeaguePicks entries={leagueEntries} revealed={results.revealed} />}
       {tab === "analysis" && <Analysis editions={analysisPosts} />}
@@ -535,7 +577,7 @@ function Shell({ children }) {
 
 function Header({ tab, setTab, pastDeadline, deadline, now, feedStatus, feedAt, onReset, confirmReset, editingOpen }) {
   const days = Math.max(0, Math.ceil((deadline - now) / 86400000));
-  const tabs = [["play", "My Picks"], ["tables", "Group Tables"], ["standings", "Standings"], ["league", "League Picks"], ["analysis", "Analysis"], ["updates", "Updates"], ["results", "Results"]];
+  const tabs = [["play", "My Picks"], ["tables", "Group Tables"], ["bracket", "Bracket"], ["standings", "Standings"], ["league", "League Picks"], ["analysis", "Analysis"], ["updates", "Updates"], ["results", "Results"]];
   return (
     <div style={{ background: C.ink, color: C.chalk, padding: "22px 14px 0" }}>
       {SANDBOX && (
@@ -846,6 +888,102 @@ function Tables({ qual }) {
           <div style={{ fontSize: 12.5, lineHeight: 1.6 }}>{qual.best8.join(" · ")}</div>
         </div>
       )}
+    </div>
+  );
+}
+
+function Bracket({ advanced }) {
+  const adv = advanced || {};
+  const cache = {};
+  function sides(num) {
+    if (cache[num]) return cache[num];
+    const m = KO_BY_NUM[num];
+    let res;
+    if (m.r === "r32") res = { a: { team: m.a, seed: m.as }, b: { team: m.b, seed: m.bs } };
+    else if (m.r === "third") res = { a: { team: loserOf(m.l1), ph: "Loser M" + m.l1 }, b: { team: loserOf(m.l2), ph: "Loser M" + m.l2 } };
+    else res = { a: { team: winnerOf(m.f1), ph: "Winner M" + m.f1 }, b: { team: winnerOf(m.f2), ph: "Winner M" + m.f2 } };
+    cache[num] = res; return res;
+  }
+  function winnerOf(num) {
+    const m = KO_BY_NUM[num]; const s = sides(num);
+    const list = adv[KO_NEXT[m.r]] || [];
+    if (s.a.team && list.includes(s.a.team)) return s.a.team;
+    if (s.b.team && list.includes(s.b.team)) return s.b.team;
+    return null;
+  }
+  function loserOf(num) {
+    const s = sides(num); const w = winnerOf(num);
+    if (!w) return null;
+    return w === s.a.team ? s.b.team : w === s.b.team ? s.a.team : null;
+  }
+  const champ = (adv.champ || [])[0] || null;
+
+  const COLS = [
+    { key: "r32", label: "Round of 32", nums: [74, 77, 73, 75, 83, 84, 81, 82, 76, 78, 79, 80, 86, 88, 85, 87] },
+    { key: "r16", label: "Round of 16", nums: [89, 90, 93, 94, 91, 92, 95, 96] },
+    { key: "qf", label: "Quarterfinals", nums: [97, 98, 99, 100] },
+    { key: "sf", label: "Semifinals", nums: [101, 102] },
+    { key: "final", label: "Final", nums: [104] },
+  ];
+  const roundColor = { r32: C.mute, r16: C.ink, qf: C.sun, sf: C.pitch, final: C.red };
+
+  function TeamRow({ side, winner, isR32 }) {
+    const known = !!side.team;
+    const isWinner = winner && side.team === winner;
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 7px", background: isWinner ? "#E4F0E8" : "transparent", borderRadius: 3 }}>
+        {isR32 && <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", color: C.chalk, background: C.ink, borderRadius: 2, padding: "1px 4px", flexShrink: 0 }}>{side.seed}</span>}
+        <span style={{ fontSize: 12.5, fontWeight: isWinner ? 700 : known ? 600 : 400, color: known ? C.ink : C.mute, fontStyle: known ? "normal" : "italic", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {known ? side.team : side.ph}
+        </span>
+      </div>
+    );
+  }
+  function MatchCard({ num }) {
+    const m = KO_BY_NUM[num]; const s = sides(num);
+    const w = m.r === "third" ? null : winnerOf(num);
+    const isR32 = m.r === "r32";
+    return (
+      <div style={{ background: C.chalk, border: `1px solid ${C.line}`, borderLeft: `3px solid ${roundColor[m.r] || C.mute}`, borderRadius: 5, padding: "5px 6px", width: 168, flexShrink: 0 }}>
+        <div style={{ fontSize: 9.5, color: C.mute, fontFamily: "'DM Mono', monospace", marginBottom: 3, lineHeight: 1.3 }}>
+          M{m.n} · {m.et}<br />{m.v}
+        </div>
+        <TeamRow side={s.a} winner={w} isR32={isR32} />
+        <div style={{ height: 1, background: C.line, margin: "1px 0" }} />
+        <TeamRow side={s.b} winner={w} isR32={isR32} />
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: "18px 14px" }}>
+      <Eyebrow>Knockout bracket</Eyebrow>
+      <p style={{ fontSize: 12, color: C.mute, marginTop: 8, lineHeight: 1.5 }}>
+        The Round of 32 is locked from the final group tables — seeds show each team's group finish (e.g. <b>1E</b> = Group E winner, <b>3D</b> = Group D third place). Later rounds fill in as results are entered. All times US Eastern. Scroll right to follow the path to the Final →
+      </p>
+      {champ && (
+        <div style={{ margin: "12px 0", padding: 12, background: C.ink, color: C.chalk, borderRadius: 5, textAlign: "center" }}>
+          <div style={{ fontSize: 11, letterSpacing: ".15em", color: C.sun, fontWeight: 700 }}>CHAMPION</div>
+          <div style={{ fontFamily: "Anton, sans-serif", fontSize: 26 }}>{champ}</div>
+        </div>
+      )}
+      <div style={{ overflowX: "auto", paddingBottom: 12, WebkitOverflowScrolling: "touch" }}>
+        <div style={{ display: "flex", gap: 14, alignItems: "stretch", minWidth: "min-content" }}>
+          {COLS.map((col) => (
+            <div key={col.key} style={{ display: "flex", flexDirection: "column" }}>
+              <div style={{ fontFamily: "Anton, sans-serif", fontSize: 13, color: roundColor[col.key], textAlign: "center", marginBottom: 8, height: 18 }}>{col.label.toUpperCase()}</div>
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-around", gap: 8 }}>
+                {col.nums.map((n) => <MatchCard key={n} num={n} />)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* Third-place playoff */}
+      <div style={{ marginTop: 16 }}>
+        <div style={{ fontFamily: "Anton, sans-serif", fontSize: 13, color: C.mute, marginBottom: 6 }}>THIRD-PLACE PLAYOFF</div>
+        <MatchCard num={103} />
+      </div>
     </div>
   );
 }
