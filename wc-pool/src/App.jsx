@@ -1289,7 +1289,7 @@ function Analysis({ editions }) {
     );
   }
 
-  function renderStandingsMovement(prevEdition, curEdition, names) {
+  function renderStandingsMovement(prevEdition, curEdition, names, movementLabel, movementFrom, movementTo) {
     const prevPicks = prevEdition.snapshot.playerPicks;
     const prevResults = prevEdition.snapshot.results;
     const curPicks = curEdition.snapshot.playerPicks;
@@ -1342,10 +1342,10 @@ function Analysis({ editions }) {
           <span style={tagStyle(C.pitch)}>MOVEMENT</span>
         </div>
         <h2 style={h2Style}>WHO'S CLIMBING, WHO'S SLIDING?</h2>
-        <p style={{ fontSize: 12, color: C.mute, fontFamily: "'DM Mono', monospace", margin: "4px 0 14px" }}>Group stage accuracy rankings: Round 1 → Round 2</p>
+        <p style={{ fontSize: 12, color: C.mute, fontFamily: "'DM Mono', monospace", margin: "4px 0 14px" }}>Group stage accuracy rankings: {movementLabel || `${movementFrom || "Round 1"} → ${movementTo || "Round 2"}`}</p>
 
         <p style={pStyle}>
-          After Round 2, the accuracy table has shuffled.
+          After {movementTo || "Round 2"}, the accuracy table has shuffled.
           {climbers.length > 0 && ` ${climbers[0].name} made the biggest move, climbing ${climbers[0].change} spot${climbers[0].change > 1 ? "s" : ""} from #${climbers[0].prevRank} to #${climbers[0].curRank}.`}
           {fallers.length > 0 && ` ${fallers[0].name} took the biggest tumble, dropping ${Math.abs(fallers[0].change)} spot${Math.abs(fallers[0].change) > 1 ? "s" : ""}.`}
         </p>
@@ -1813,7 +1813,7 @@ function Analysis({ editions }) {
                   return <React.Fragment key={ci}>{renderMatchdayReport(playerPicks, actualScores, names, roundMatches, roundPlayed, edition.roundLabel || "First round", edition.tagLabel || "MATCHDAY 1-2", edition.headline || "THE CRYSTAL BALL IS CRACKED")}</React.Fragment>;
                 }
                 if (card === "standings-movement" && idx < editions.length - 1) {
-                  return <React.Fragment key={ci}>{renderStandingsMovement(editions[idx + 1], edition, names)}</React.Fragment>;
+                  return <React.Fragment key={ci}>{renderStandingsMovement(editions[idx + 1], edition, names, edition.movementLabel, edition.movementFrom, edition.movementTo)}</React.Fragment>;
                 }
                 if (card === "knockout-vision") {
                   return <React.Fragment key={ci}>{renderKnockoutVision(playerPicks, names)}</React.Fragment>;

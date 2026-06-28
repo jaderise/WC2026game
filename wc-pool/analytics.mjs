@@ -434,7 +434,7 @@ async function main() {
   const editionArg = process.argv[2] || "round1";
 
   // Filter results to only include matches up to this edition's cutoff
-  const maxMatch = editionArg === "round2" ? 48 : 24;
+  const maxMatch = editionArg === "round3" ? 72 : editionArg === "round2" ? 48 : 24;
   const filteredScores = {};
   for (const [m, s] of Object.entries(results.scores || {})) {
     if (Number(m) <= maxMatch) filteredScores[m] = s;
@@ -445,7 +445,22 @@ async function main() {
   };
 
   let newEdition;
-  if (editionArg === "round2") {
+  if (editionArg === "round3") {
+    newEdition = {
+      id: "round3",
+      title: "Round 3 — The Groups Are Settled",
+      headline: "THE GROUPS ARE SETTLED",
+      publishedAt: new Date().toISOString(),
+      roundLabel: "Final round",
+      tagLabel: "MATCHDAY 5-6",
+      matchRange: [49, 72],
+      movementLabel: "Round 2 → Round 3",
+      movementFrom: "Round 2",
+      movementTo: "Round 3",
+      cards: ["matchday", "standings-movement", "consensus"],
+      snapshot,
+    };
+  } else if (editionArg === "round2") {
     newEdition = {
       id: "round2",
       title: "Round 2 — The Plot Thickens",
@@ -457,6 +472,9 @@ async function main() {
       previewRange: [49, 72],
       previewLabel: "Round 3",
       previewTagLabel: "MATCHDAY 5-6",
+      movementLabel: "Round 1 → Round 2",
+      movementFrom: "Round 1",
+      movementTo: "Round 2",
       cards: ["matchday", "standings-movement", "consensus", "preview"],
       snapshot,
     };
