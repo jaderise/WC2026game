@@ -1248,17 +1248,29 @@ function Results({ results, setScore, toggleResultAdvance, qual, setManualOrder,
           <p style={{ fontSize: 12.5, color: C.mute, lineHeight: 1.5, marginTop: 0 }}>Round of 32 fills automatically from group scores once all groups are complete{qual.allComplete ? " — done ✓" : " (not yet)"}. Later rounds now auto-fill from the live feed (including extra time and penalties). You can still tap below to override a round manually — a manual edit takes precedence over the feed for that round.</p>
           {ROUNDS.filter((r) => r.key !== "r32").map((r) => {
             const chosen = new Set(results.advanced[r.key] || []); const meta = results.advancedMeta[r.key];
+            // Only teams that advanced from the prior round are eligible for this one.
+            const priorMap = {
+              r16: qual.allComplete ? qual.r32 : [],
+              qf: results.advanced.r16 || [],
+              sf: results.advanced.qf || [],
+              final: results.advanced.sf || [],
+              champ: results.advanced.final || [],
+            };
+            const priorLabel = { r16: "Round of 32", qf: "Round of 16", sf: "Quarterfinals", final: "Semifinals", champ: "Final" }[r.key];
+            const pool = [...new Set([...(priorMap[r.key] || []), ...(results.advanced[r.key] || [])])].sort();
             return (
               <div key={r.key} style={{ marginBottom: 18 }}>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
                   <span style={{ fontFamily: "Anton, sans-serif", fontSize: 18 }}>{r.label.toUpperCase()}</span>
                   <span style={{ fontSize: 11, color: C.mute, fontFamily: "'DM Mono', monospace" }}>{chosen.size}/{r.count}{meta ? ` · ${meta.by} ${ago(meta.at)}` : ""}</span>
                 </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {ALL_TEAMS.map((t) => { const on = chosen.has(t); const full = chosen.size >= r.count && !on;
-                    return <button key={t} disabled={full} onClick={() => toggleResultAdvance(r.key, t, r.count)} style={{ border: `1.5px solid ${on ? C.ink : C.line}`, background: on ? C.ink : C.chalk, color: on ? C.chalk : (full ? "#B5AE9E" : C.ink), padding: "5px 8px", borderRadius: 2, fontSize: 11.5, fontWeight: 600, cursor: full ? "default" : "pointer", fontFamily: "inherit" }}>{t}</button>;
-                  })}
-                </div>
+                {pool.length === 0
+                  ? <div style={{ fontSize: 12, color: C.mute, fontStyle: "italic" }}>Set the {priorLabel} first — only teams that reach it can be picked here.</div>
+                  : <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {pool.map((t) => { const on = chosen.has(t); const full = chosen.size >= r.count && !on;
+                        return <button key={t} disabled={full} onClick={() => toggleResultAdvance(r.key, t, r.count)} style={{ border: `1.5px solid ${on ? C.ink : C.line}`, background: on ? C.ink : C.chalk, color: on ? C.chalk : (full ? "#B5AE9E" : C.ink), padding: "5px 8px", borderRadius: 2, fontSize: 11.5, fontWeight: 600, cursor: full ? "default" : "pointer", fontFamily: "inherit" }}>{t}</button>;
+                      })}
+                    </div>}
               </div>
             );
           })}
