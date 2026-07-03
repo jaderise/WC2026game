@@ -637,9 +637,9 @@ function Shell({ children }) {
 
 function Header({ tab, setTab, pastDeadline, deadline, now, feedStatus, feedAt, onReset, confirmReset, editingOpen }) {
   const days = Math.max(0, Math.ceil((deadline - now) / 86400000));
-  const tabs = [["play", "My Picks"], ["tables", "Group Tables"], ["bracket", "Bracket"], ["standings", "Standings"], ["league", "League Picks"], ["analysis", "Analysis"], ["updates", "Updates"], ["results", "Results"]];
+  const tabs = [["play", "My Picks"], ["tables", "Groups"], ["bracket", "Bracket"], ["standings", "Standings"], ["league", "League"], ["analysis", "Analysis"], ["updates", "Updates"], ["results", "Results"]];
   return (
-    <div style={{ background: C.ink, color: C.chalk, padding: "22px 14px 0" }}>
+    <div style={{ background: C.ink, color: C.chalk, padding: "22px 14px 12px" }}>
       {SANDBOX && (
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: C.red, color: C.chalk, margin: "-22px -14px 14px", padding: "8px 14px", fontSize: 12, fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase" }}>
           <span>● Sandbox · test data only</span>
@@ -654,9 +654,9 @@ function Header({ tab, setTab, pastDeadline, deadline, now, feedStatus, feedAt, 
       <div style={{ fontSize: 10.5, color: feedStatus === "fail" ? "#E59B92" : "#9FE3BE", marginBottom: 12, fontFamily: "'DM Mono', monospace" }}>
         {feedStatus === "fail" ? "auto-feed offline · enter scores manually" : feedAt ? `auto-feed synced ${ago(feedAt)}` : "auto-feed connecting…"}
       </div>
-      <div style={{ display: "flex", gap: 2 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
         {tabs.map(([k, lbl]) => (
-          <button key={k} onClick={() => setTab(k)} style={{ flex: 1, background: tab === k ? C.paper : "transparent", color: tab === k ? C.ink : "#C7D0DE", border: "none", borderTopLeftRadius: 6, borderTopRightRadius: 6, padding: "10px 4px", fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>{lbl}</button>
+          <button key={k} onClick={() => setTab(k)} style={{ flex: "1 1 auto", minWidth: 74, background: tab === k ? C.paper : "rgba(255,255,255,0.06)", color: tab === k ? C.ink : "#C7D0DE", border: "none", borderRadius: 6, padding: "9px 8px", fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>{lbl}</button>
         ))}
       </div>
     </div>
