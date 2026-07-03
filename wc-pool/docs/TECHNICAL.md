@@ -402,7 +402,11 @@ Only the outcome matters (H/D/A), not the exact score.
 | `HBar` | data, maxVal, barColor, height, showPct, total | Horizontal bar chart |
 | `DotRow` | label, outcomes, playerNames, total | Dot matrix for match outcome distribution |
 
-The Analysis component uses internal render functions for each card type: `renderMatchdayReport`, `renderStandingsMovement`, `renderKnockoutVision`, `renderConsensusCard`, `renderPreviewCard`. Each edition's `cards` array determines which render functions are called.
+The Analysis component uses internal render functions for each card type: `renderMatchdayReport`, `renderStandingsMovement`, `renderKnockoutVision`, `renderConsensusCard`, `renderPreviewCard`, `renderKnockoutPreview`. Each edition's `cards` array determines which render functions are called.
+
+Two edition flags tune these cards:
+- `includeR32` (on `standings-movement`): when true, the movement card ranks by **total points** (`scorePlayer` → group ×1 + Round-of-32 ×2) instead of raw group-outcome counts, so it matches the Standings tab once the R32 field is known.
+- `knockout-preview` card (`renderKnockoutPreview`): computes the actual R32 field from the snapshot (`computeQualifiers`) and reports champion/semifinal survival, deep picks eliminated in the groups, and R32 "collision" matchups where two commonly-picked teams meet (guaranteed to knock one out).
 
 ---
 
@@ -481,8 +485,9 @@ Serves `dist/` directory. SPA rewrite rule sends all routes to `index.html`.
 **Usage:**
 ```bash
 cd wc-pool
-node analytics.mjs round1    # Save/update Round 1 edition
-node analytics.mjs round2    # Save/update Round 2 edition
+node analytics.mjs round1    # Save/update Round 1 edition (matches 1–24)
+node analytics.mjs round2    # Save/update Round 2 edition (matches 25–48)
+node analytics.mjs round3    # Save/update Round 3 edition (matches 49–72, group stage complete)
 node analytics.mjs            # Defaults to round1
 ```
 

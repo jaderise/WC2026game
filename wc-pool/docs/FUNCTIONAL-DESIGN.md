@@ -100,7 +100,7 @@ Shows every player's full bracket, allowing comparison across the pool.
 
 ### Tab 6: Analysis
 
-A blog-style analytics page with data visualizations and narratives about the pool's collective predictions. Analysis is organized into **editions** (e.g., Round 1, Round 2), each rendered from a **frozen snapshot** saved to Firestore so the analysis doesn't change as new match results come in. New editions are created by running `analytics.mjs` with a round argument.
+A blog-style analytics page with data visualizations and narratives about the pool's collective predictions. Analysis is organized into **editions** (Round 1, Round 2, Round 3, …), each rendered from a **frozen snapshot** saved to Firestore so the analysis doesn't change as new match results come in. New editions are created by running `analytics.mjs` with a round argument.
 
 The latest edition is fully expanded at the top of the page. Older editions collapse into a clickable bar with a chevron (▶) indicator — tap to expand and see the full analysis. Each edition displays its published date.
 
@@ -145,6 +145,22 @@ The latest edition is fully expanded at the top of the page. Older editions coll
 **Card 4: "What's Coming in Round 3" — Round 3 Preview**
 - Same format as Round 2 preview but covering matches 49–72
 
+#### Edition 3: "Round 3 — The Groups Are Settled"
+
+**Card 1: "The Groups Are Settled" — Matchday Report (Matches 49–72)**
+- Same format as earlier matchday reports, covering the final round of group matches
+
+**Card 2: "Who's Climbing, Who's Sliding?" — Standings Movement (Round 2 → Round 3)**
+- Now ranks by **total points** — group outcomes (1 pt) plus the Round-of-32 points (2 pts per correct qualifier) that land once the groups finish — so it matches the Standings tab. Each row shows the total with a group/R32 breakdown and movement arrows.
+
+**Card 3: "The Bracket Survivors" — Knockout Preview**
+- **Title picks still alive** — each player's champion pick with a ✓/✗ for whether it reached the Round of 32, plus how many of their four semifinalists survived
+- **Gone too soon** — teams backed to reach the semifinals or beyond that were eliminated in the group stage
+- **Collision course** — Round of 32 matchups that pit two commonly-picked teams against each other, guaranteeing a popular pick is knocked out (e.g., Netherlands vs. Morocco), with how many brackets backed both
+
+**Card 4: "The Scores We All Agreed On" — Round 3 Consensus**
+- Same format as the earlier consensus cards, covering matches 49–72
+
 Analysis by Claude is credited on the page.
 
 ### Tab 7: Updates
@@ -174,6 +190,7 @@ The commissioner's scoring and tournament management interface. Only accessible 
 - The **Round of 32** fills automatically from the completed group tables (top 2 per group + best 8 third-place teams)
 - **R16 → Champion now fill in automatically from the auto-feed** as knockout matches are played — including matches decided in extra time or on penalties. A "Knockout results (auto-fed)" readout lists each played match with its score and winner.
 - The commissioner can still tap teams to **override a round manually**; a manual edit takes precedence over the feed for that round (the feed won't overwrite it)
+- Each round's team buttons are **filtered to the teams that advanced from the prior round** — the Round of 16 offers only the 32 qualifiers, the Quarterfinals only the teams in the R16 result, and so on. Eliminated teams disappear as options in later rounds. If the prior round hasn't been set yet, the round prompts to set it first.
 
 **Commissioner Controls** (located at the bottom of the Results tab)
 - **Open/Close Editing** — temporarily allows all players to modify their picks after the deadline (used for corrections)
@@ -291,7 +308,7 @@ The app automatically fetches live match scores from the openfootball project on
 - Designed primarily for mobile use (friends checking on phones)
 - Large tap targets for score inputs and team selection buttons
 - Sticky toast notifications for save confirmations
-- Tab bar at the top with horizontal scroll on narrow screens
+- Tab bar at the top wraps into rows of pill-style buttons so all tabs stay visible on narrow screens (2 rows of 4 on a phone, a single row on wider screens)
 
 ---
 
