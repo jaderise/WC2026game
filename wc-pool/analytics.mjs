@@ -465,8 +465,7 @@ async function main() {
       collisionNote: "Every player left the USA out of their semifinals — Mauricio Pochettino would ask, “why not us?” The twist: Daaaaaaaave and Gary, both Americans, backed Belgium to reach the last four — never guessing the US would be staring them down in Seattle in the sweet 16.",
       customTidbits: [
         { h: "The DeRise brothers back La Roja", p: "Jason, Greg and Eric all put their Spanish heritage on the line — every one of the brothers has Spain lifting the trophy." },
-        { h: "The London connection", p: "Six of these brackets trace back to London, and Jason is the thread running through all of them. He worked alongside Kyle, Mark and Andrew in the city; his brother Greg spent time there for his own company; and his daughter Rebecca was born a Londoner, British passport and all. A whole friendship group — and a family — assembled an ocean from home. Fittingly, the champion picks map to where each heart really lives: Andrew and London-born Rebecca back England, while the American expats and the Spanish-blooded DeRise brothers look abroad — Spain for Jason and Greg, France for Mark, Argentina for Kyle." },
-        { h: "…and they still can't shake each other", p: "That same London six have bunched right back up in the table like an old group chat — they hold every spot from 6th to 11th, the whole reunion separated by just nine points." },
+        { h: "The London connection", p: "Of the six players with connections to London, only the UK citizens of the group, Andrew and Rebecca, backed England to win it all. Meanwhile Mark, Kyle, Jason and Greg all back other countries despite England being their home for many years. That same London six have bunched right back up in the table like an old group chat — they hold every spot from 6th to 11th, the whole reunion separated by just nine points." },
       ],
       snapshot: koSnapshot,
     };
