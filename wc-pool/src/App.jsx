@@ -1845,10 +1845,11 @@ function Analysis({ editions }) {
   }
 
   function renderQFQuestion(playerPicks, results, names) {
-    const { survivors, bracket, countIn } = computeKO(playerPicks, results, names);
+    const { survivors, bracket, countIn, whoIn } = computeKO(playerPicks, results, names);
     const arr = [...survivors].map((t) => ({ t, c: countIn(t, "qf") })).sort((a, b) => b.c - a.c);
     const consensus = arr.slice(0, 5);
     const quiet = arr.filter((x) => x.c <= 2);
+    const longshots = arr.filter((x) => x.c > 0 && x.c <= Math.floor(bracket.length * 0.5)).sort((a, b) => a.c - b.c);
     return (
       <div style={cardStyle}>
         <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
@@ -1861,6 +1862,18 @@ function Analysis({ editions }) {
           {quiet.length > 0 && ` The contrarian gold is hiding among the quiet survivors: almost nobody has ${quiet.slice(0, 3).map((x) => x.t).join(", ")} going deeper, so whoever rides one into the last eight banks points the rest of the pool won't.`}
         </p>
         <HBar data={arr.map((x) => ({ label: x.t, value: x.c, color: x.c >= Math.ceil(bracket.length * 0.6) ? C.pitch : x.c >= 3 ? C.ink : C.mute })).slice(0, 12)} maxVal={bracket.length} height={20} />
+        {longshots.length > 0 && (<>
+          <h3 style={h3Style}>RIDING THE LONGSHOTS</h3>
+          <p style={pStyle}>
+            With the table bunched this tight, these are the picks that could crack it open. Here's exactly who's still backing each of the quieter survivors into the last eight — if one lands, it's a five-point swing the rest of the pool doesn't get.
+          </p>
+          {longshots.map((x) => (
+            <div key={x.t} style={{ display: "flex", gap: 10, padding: "6px 0", borderBottom: `1px solid ${C.line}`, fontSize: 13 }}>
+              <div style={{ width: 88, flexShrink: 0, fontWeight: 700 }}>{x.t} <span style={{ fontSize: 11, color: C.mute, fontWeight: 400 }}>({x.c})</span></div>
+              <div style={{ flex: 1, color: C.ink }}>{whoIn(x.t, "qf").join(", ")}</div>
+            </div>
+          ))}
+        </>)}
       </div>
     );
   }
