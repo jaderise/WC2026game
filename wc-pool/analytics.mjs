@@ -445,7 +445,31 @@ async function main() {
   };
 
   let newEdition;
-  if (editionArg === "round3") {
+  if (editionArg === "r32") {
+    // Post–Round of 32 edition: capture the R16 field (advanced.r16) and the R32 match
+    // results (koScores) so the survivor/collision/title-race cards can be computed.
+    const koSnapshot = {
+      playerPicks: snapPicks,
+      results: {
+        scores: results.scores || {},
+        advanced: results.advanced || {},
+        koScores: results.koScores || {},
+      },
+    };
+    newEdition = {
+      id: "ko-r32",
+      title: "Round of 32 — The Cull",
+      headline: "THE CULL",
+      publishedAt: new Date().toISOString(),
+      cards: ["survivors", "broken-brackets", "r16-collisions", "qf-question", "title-race", "odds-ends"],
+      collisionNote: "Every player left the USA out of their semifinals — Mauricio Pochettino would ask, “why not us?” The twist: Daaaaaaaave and Gary, both Americans, backed Belgium to reach the last four — never guessing the US would be staring them down in Seattle in the sweet 16.",
+      customTidbits: [
+        { h: "The DeRise brothers back La Roja", p: "Jason, Greg and Eric all put their Spanish heritage on the line — every one of the brothers has Spain lifting the trophy." },
+        { h: "The English contingent is split on the Three Lions", p: "Of the five with English roots, only Andrew and Rebecca backed England to win it all. Mark, Jason and Greg looked elsewhere — France and Spain over their former home." },
+      ],
+      snapshot: koSnapshot,
+    };
+  } else if (editionArg === "round3") {
     // Freeze knockout advancement empty — this edition is the moment the groups finished,
     // so standings movement reflects group points + Round-of-32 points only.
     const r3snapshot = {

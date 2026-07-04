@@ -1711,6 +1711,237 @@ function Analysis({ editions }) {
     );
   }
 
+  function computeKO(playerPicks, results, names) {
+    const q = computeQualifiers(results.scores || {}, results.manualOrder || {}, results.manualThird || []);
+    const r32Set = new Set(q.allComplete ? q.r32 : []);
+    const survivors = new Set(results.advanced?.r16 || []);
+    const ko = results.koScores || {};
+    const bracket = names.filter((n) => (playerPicks[n].advanced?.champ || []).length || (playerPicks[n].advanced?.sf || []).length);
+    const r16matches = KNOCKOUT.filter((m) => m.r === "r16").map((m) => ({ n: m.n, et: m.et, v: m.v, a: ko[m.f1]?.winner, b: ko[m.f2]?.winner }));
+    const countIn = (team, rk) => bracket.filter((n) => (playerPicks[n].advanced?.[rk] || []).includes(team)).length;
+    const whoIn = (team, rk) => bracket.filter((n) => (playerPicks[n].advanced?.[rk] || []).includes(team));
+    return { r32Set, survivors, ko, bracket, r16matches, countIn, whoIn };
+  }
+
+  function renderSurvivors(playerPicks, results, names) {
+    const { survivors, bracket, countIn, whoIn } = computeKO(playerPicks, results, names);
+    const nB = bracket.length;
+    const arr = [...survivors].map((t) => ({ t, c: countIn(t, "r16") })).sort((a, b) => b.c - a.c);
+    const chalk = arr.filter((x) => x.c >= Math.ceil(nB * 0.85));
+    const ghosts = arr.filter((x) => x.c === 0);
+    const sharp = arr.filter((x) => x.c > 0 && x.c <= Math.max(5, Math.floor(nB * 0.4)));
+    return (
+      <div style={cardStyle}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+          <span style={tagStyle(C.ink)}>ROUND OF 32</span><span style={tagStyle(C.pitch)}>SURVIVORS</span>
+        </div>
+        <h2 style={h2Style}>THE SURVIVORS</h2>
+        <p style={{ fontSize: 12, color: C.mute, fontFamily: "'DM Mono', monospace", margin: "4px 0 14px" }}>The 16 teams still standing vs. {nB} brackets</p>
+        <p style={pStyle}>
+          The favourites did their job.
+          {chalk.length > 0 && ` ${chalk.map((x) => x.t).join(", ")} were the chalk — ${chalk.filter((x) => x.c === nB).length > 0 ? `${chalk.filter((x) => x.c === nB).map((x) => x.t).join(", ")} appeared in every single bracket. ` : "backed by nearly everyone. "}`}
+          {ghosts.length > 0 && ` But the beautiful game left a calling card: ${ghosts.map((x) => x.t).join(" and ")} crashed the party that nobody invited them to — reaching the last 16 in exactly zero brackets.`}
+        </p>
+        <h3 style={h3Style}>THE CHALK</h3>
+        <HBar data={arr.slice(0, 8).map((x) => ({ label: x.t, value: x.c, color: x.c >= Math.ceil(nB * 0.85) ? C.pitch : x.c >= Math.ceil(nB * 0.4) ? C.ink : C.mute }))} maxVal={nB} showPct total={nB} height={22} />
+        {sharp.length > 0 && (<>
+          <h3 style={h3Style}>THE SHARP FEW</h3>
+          <p style={pStyle}>A tip of the cap to the eagle-eyed who saw what others missed:</p>
+          {sharp.map((x) => (
+            <div key={x.t} style={{ padding: "5px 0", borderBottom: `1px solid ${C.line}`, fontSize: 13 }}>
+              <span style={{ fontWeight: 700 }}>{x.t}</span> <span style={{ fontSize: 11, color: C.mute }}>({x.c} {x.c === 1 ? "believer" : "believers"})</span> — {whoIn(x.t, "r16").join(", ") || "nobody"}
+            </div>
+          ))}
+        </>)}
+      </div>
+    );
+  }
+
+  function renderBrokenBrackets(playerPicks, results, names) {
+    const { r32Set, survivors, bracket } = computeKO(playerPicks, results, names);
+    const broken = [];
+    const intact = [];
+    for (const n of bracket) {
+      const a = playerPicks[n].advanced || {};
+      const champ = (a.champ || [])[0];
+      const dead = [];
+      for (const t of (a.sf || [])) {
+        if (!survivors.has(t)) dead.push({ t, level: champ === t ? "Champion" : (a.final || []).includes(t) ? "Finalist" : "Semifinalist", where: r32Set.has(t) ? "lost in the R32" : "out in the groups" });
+      }
+      if (dead.length) { dead.sort((x, y) => ({ Champion: 0, Finalist: 1, Semifinalist: 2 }[x.level] - { Champion: 0, Finalist: 1, Semifinalist: 2 }[y.level])); broken.push({ n, dead }); }
+      else if ((a.sf || []).length === 4 && champ) intact.push({ n, champ });
+    }
+    const champAlive = bracket.filter((n) => { const c = (playerPicks[n].advanced?.champ || [])[0]; return c && survivors.has(c); }).length;
+    return (
+      <div style={cardStyle}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+          <span style={tagStyle(C.ink)}>ROUND OF 32</span><span style={tagStyle(C.red)}>DAMAGE</span>
+        </div>
+        <h2 style={h2Style}>BROKEN BRACKETS</h2>
+        <p style={{ fontSize: 12, color: C.mute, fontFamily: "'DM Mono', monospace", margin: "4px 0 14px" }}>Whose deep picks are already gone</p>
+        <p style={pStyle}>
+          {broken.length > 0 ? `${broken.length} ${broken.length > 1 ? "brackets took a hit" : "bracket took a hit"} in the Round of 32 — a semifinalist or better already sent home. A dent, not a disaster: every one of them is still very much alive for the title.` : "Remarkably, not a single deep pick has fallen yet."}
+          {champAlive === bracket.length && ` And here's the kicker — every player's champion pick is still breathing.`}
+        </p>
+        {broken.map((b) => (
+          <div key={b.n} style={{ padding: "7px 0", borderBottom: `1px solid ${C.line}`, fontSize: 13 }}>
+            <span style={{ fontWeight: 700 }}>{b.n}</span>: {b.dead.map((d, i) => (
+              <span key={i}>{i > 0 ? "; " : " "}<span style={{ color: C.red, fontWeight: 600 }}>{d.t}</span> <span style={{ fontSize: 11, color: C.mute }}>({d.level}, {d.where})</span></span>
+            ))}
+          </div>
+        ))}
+        {intact.length > 0 && (<>
+          <h3 style={h3Style}>STILL PERFECT</h3>
+          <p style={pStyle}>{intact.length} {intact.length > 1 ? "brackets have" : "bracket has"} a fully intact Final Four with their champion still standing:</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {intact.map((x) => <span key={x.n} style={{ background: C.paper, border: `1px solid ${C.line}`, borderRadius: 4, padding: "4px 8px", fontSize: 12 }}><b>{x.n}</b> <span style={{ color: C.pitch }}>· {x.champ}</span></span>)}
+          </div>
+        </>)}
+      </div>
+    );
+  }
+
+  function renderR16Collisions(playerPicks, results, names, collisionNote) {
+    const { r16matches, bracket, countIn } = computeKO(playerPicks, results, names);
+    const cols = r16matches.filter((m) => m.a && m.b).map((m) => {
+      const both = bracket.filter((n) => { const qf = playerPicks[n].advanced?.qf || []; return qf.includes(m.a) && qf.includes(m.b); });
+      return { ...m, both, aQF: countIn(m.a, "qf"), bQF: countIn(m.b, "qf") };
+    }).sort((x, y) => y.both.length - x.both.length);
+    const hot = cols.filter((c) => c.both.length > 0);
+    return (
+      <div style={cardStyle}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+          <span style={tagStyle(C.ink)}>ROUND OF 16</span><span style={tagStyle(C.red)}>COLLISIONS</span>
+        </div>
+        <h2 style={h2Style}>COLLISION COURSE</h2>
+        <p style={{ fontSize: 12, color: C.mute, fontFamily: "'DM Mono', monospace", margin: "4px 0 14px" }}>Matchups that pit two of the pool's favourites together</p>
+        <p style={pStyle}>The draw was cruel in places — some ties force two popular picks to meet, and only one can go through.</p>
+        {hot.map((c) => (
+          <div key={c.n} style={{ background: C.paper, borderRadius: 6, padding: "10px 12px", marginBottom: 8, borderLeft: `4px solid ${C.red}` }}>
+            <div style={{ fontSize: 14, fontWeight: 700 }}>{c.a} <span style={{ color: C.red }}>vs</span> {c.b}</div>
+            <div style={{ fontSize: 11.5, color: C.mute, fontFamily: "'DM Mono', monospace", marginTop: 2 }}>M{c.n} · {c.et} · {c.v}</div>
+            <div style={{ fontSize: 12.5, marginTop: 4, lineHeight: 1.5 }}>
+              <b>{c.both.length}</b> {c.both.length > 1 ? "brackets" : "bracket"} picked <b>both</b> into the quarters — a guaranteed casualty: {c.both.join(", ")}.
+            </div>
+          </div>
+        ))}
+        {collisionNote && (
+          <div style={{ background: C.ink, color: C.chalk, borderRadius: 6, padding: "12px 14px", marginTop: 8 }}>
+            <div style={{ fontSize: 11, letterSpacing: ".12em", color: C.sun, fontWeight: 700, marginBottom: 4 }}>THE SEATTLE SUBPLOT</div>
+            <div style={{ fontSize: 13, lineHeight: 1.55 }}>{collisionNote}</div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderQFQuestion(playerPicks, results, names) {
+    const { survivors, bracket, countIn } = computeKO(playerPicks, results, names);
+    const arr = [...survivors].map((t) => ({ t, c: countIn(t, "qf") })).sort((a, b) => b.c - a.c);
+    const consensus = arr.slice(0, 5);
+    const quiet = arr.filter((x) => x.c <= 2);
+    return (
+      <div style={cardStyle}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+          <span style={tagStyle(C.ink)}>ROUND OF 16</span><span style={tagStyle(C.sun)}>QF PICKS</span>
+        </div>
+        <h2 style={h2Style}>THE QUARTERFINAL QUESTION</h2>
+        <p style={{ fontSize: 12, color: C.mute, fontFamily: "'DM Mono', monospace", margin: "4px 0 14px" }}>Who the pool backs to reach the last eight</p>
+        <p style={pStyle}>
+          The pool is piling onto the same few horses — {consensus.slice(0, 4).map((x) => `${x.t} (${x.c})`).join(", ")} are the consensus picks for the quarterfinals.
+          {quiet.length > 0 && ` The contrarian gold is hiding among the quiet survivors: almost nobody has ${quiet.slice(0, 3).map((x) => x.t).join(", ")} going deeper, so whoever rides one into the last eight banks points the rest of the pool won't.`}
+        </p>
+        <HBar data={arr.map((x) => ({ label: x.t, value: x.c, color: x.c >= Math.ceil(bracket.length * 0.6) ? C.pitch : x.c >= 3 ? C.ink : C.mute })).slice(0, 12)} maxVal={bracket.length} height={20} />
+      </div>
+    );
+  }
+
+  function renderTitleRace(playerPicks, results, names) {
+    const { survivors, bracket } = computeKO(playerPicks, results, names);
+    const alive = (t) => survivors.has(t);
+    const ceiling = (p) => {
+      const a = p.advanced || {};
+      const qf = (a.qf || []).filter(alive).length, sf = (a.sf || []).filter(alive).length, fin = (a.final || []).filter(alive).length, ch = ((a.champ || [])[0] && alive((a.champ || [])[0])) ? 1 : 0;
+      return qf * 5 + sf * 8 + fin * 13 + ch * 21;
+    };
+    const rows = names.map((n) => { const cur = scorePlayer(playerPicks[n], results).total; const ceil = bracket.includes(n) ? ceiling(playerPicks[n]) : 0; return { n, cur, ceil, max: cur + ceil, hasBracket: bracket.includes(n) }; }).sort((a, b) => b.cur - a.cur);
+    const leader = rows[0];
+    const race = rows.filter((r) => r.hasBracket);
+    const eliminated = race.filter((r) => r.n !== leader.n && r.max < leader.cur);
+    const spread = race[0].cur - race[Math.min(9, race.length - 1)].cur;
+    return (
+      <div style={cardStyle}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+          <span style={tagStyle(C.ink)}>STANDINGS</span><span style={tagStyle(C.pitch)}>TITLE RACE</span>
+        </div>
+        <h2 style={h2Style}>IS IT STILL ALL TO PLAY FOR?</h2>
+        <p style={{ fontSize: 12, color: C.mute, fontFamily: "'DM Mono', monospace", margin: "4px 0 14px" }}>Group + R32 + R16 locked · what's left to win</p>
+        <p style={pStyle}>
+          {eliminated.length === 0
+            ? "Yes — wildly so. The whole field is still standing: not a single player is mathematically out of catching the leader. "
+            : `${race.length - eliminated.length} players are still live for the title. `}
+          The points only get bigger from here (Quarterfinals 5, Semis 8, Final 13, <b>Champion 21</b>), so the board can flip in an afternoon.
+          {" "}<b>{leader.n}</b> leads on {leader.cur}, but the top ten are packed inside just {spread} points — less than a single correct Final pick.
+        </p>
+        {eliminated.length > 0 && (
+          <p style={{ ...pStyle, color: C.mute }}>Out of reach of the leader, but still playing for pride: {eliminated.map((r) => r.n).join(", ")}.</p>
+        )}
+        {race.map((r, i) => (
+          <div key={r.n} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: `1px solid ${C.line}` }}>
+            <div style={{ width: 24, fontWeight: 700, fontSize: 15, fontFamily: "Anton, sans-serif", textAlign: "center" }}>{i + 1}</div>
+            <div style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{r.n}</div>
+            <div style={{ fontSize: 12, fontFamily: "'DM Mono', monospace", color: C.ink }}>{r.cur}</div>
+            <div style={{ fontSize: 11, fontFamily: "'DM Mono', monospace", color: C.mute, width: 78, textAlign: "right" }}>+{r.ceil} left</div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  function renderOddsEnds(playerPicks, results, names, customTidbits) {
+    const { survivors, bracket, countIn, whoIn } = computeKO(playerPicks, results, names);
+    const ghosts = [...survivors].filter((t) => countIn(t, "r16") === 0);
+    const lowSurv = [...survivors].filter((t) => countIn(t, "r16") > 0 && countIn(t, "r16") <= 5);
+    let maverick = null, mavCount = -1;
+    for (const n of bracket) { const c = lowSurv.filter((t) => (playerPicks[n].advanced?.r16 || []).includes(t)).length; if (c > mavCount) { mavCount = c; maverick = n; } }
+    const champByTeam = {};
+    for (const n of bracket) { const c = (playerPicks[n].advanced?.champ || [])[0]; if (c && survivors.has(c)) champByTeam[c] = (champByTeam[c] || 0) + 1; }
+    const topChamp = Object.entries(champByTeam).sort((a, b) => b[1] - a[1])[0];
+    return (
+      <div style={cardStyle}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+          <span style={tagStyle(C.ink)}>ODDS & ENDS</span>
+        </div>
+        <h2 style={h2Style}>ODDS & ENDS</h2>
+        <p style={{ fontSize: 12, color: C.mute, fontFamily: "'DM Mono', monospace", margin: "4px 0 14px" }}>The little stories in the picks</p>
+        {(customTidbits || []).map((t, i) => (
+          <div key={i} style={{ marginBottom: 12 }}>
+            <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 2 }}>{t.h}</div>
+            <div style={{ fontSize: 13, lineHeight: 1.55, color: C.ink }}>{t.p}</div>
+          </div>
+        ))}
+        {maverick && mavCount >= 2 && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 2 }}>{maverick}, the maverick</div>
+            <div style={{ fontSize: 13, lineHeight: 1.55 }}>The bracket that zagged when everyone zigged called {mavCount} of the pool's least-fancied survivors into the last 16 — {lowSurv.filter((t) => (playerPicks[maverick].advanced?.r16 || []).includes(t)).join(", ")}.</div>
+          </div>
+        )}
+        {topChamp && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 2 }}>The people's champion</div>
+            <div style={{ fontSize: 13, lineHeight: 1.55 }}>{topChamp[0]} is the most-backed title pick still standing, carried by {topChamp[1]} {topChamp[1] > 1 ? "players" : "player"}: {whoIn(topChamp[0], "champ").join(", ")}.</div>
+          </div>
+        )}
+        {ghosts.length > 0 && (
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 2 }}>The tournament ghost</div>
+            <div style={{ fontSize: 13, lineHeight: 1.55 }}>{ghosts.join(" and ")} — in the last 16, and in exactly zero brackets.</div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   function renderConsensusCard(playerPicks, actualScores, names, roundMatches, tagLabel) {
     const consensus = roundMatches.map((mm) => {
       const outcomes = { H: 0, D: 0, A: 0 };
@@ -2159,6 +2390,24 @@ function Analysis({ editions }) {
                 }
                 if (card === "knockout-preview") {
                   return <React.Fragment key={ci}>{renderKnockoutPreview(playerPicks, snapResults, names)}</React.Fragment>;
+                }
+                if (card === "survivors") {
+                  return <React.Fragment key={ci}>{renderSurvivors(playerPicks, snapResults, names)}</React.Fragment>;
+                }
+                if (card === "broken-brackets") {
+                  return <React.Fragment key={ci}>{renderBrokenBrackets(playerPicks, snapResults, names)}</React.Fragment>;
+                }
+                if (card === "r16-collisions") {
+                  return <React.Fragment key={ci}>{renderR16Collisions(playerPicks, snapResults, names, edition.collisionNote)}</React.Fragment>;
+                }
+                if (card === "qf-question") {
+                  return <React.Fragment key={ci}>{renderQFQuestion(playerPicks, snapResults, names)}</React.Fragment>;
+                }
+                if (card === "title-race") {
+                  return <React.Fragment key={ci}>{renderTitleRace(playerPicks, snapResults, names)}</React.Fragment>;
+                }
+                if (card === "odds-ends") {
+                  return <React.Fragment key={ci}>{renderOddsEnds(playerPicks, snapResults, names, edition.customTidbits)}</React.Fragment>;
                 }
                 if (card === "consensus") {
                   const matchRange = edition.matchRange || [1, 24];
