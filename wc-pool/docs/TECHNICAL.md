@@ -402,11 +402,22 @@ Only the outcome matters (H/D/A), not the exact score.
 | `HBar` | data, maxVal, barColor, height, showPct, total | Horizontal bar chart |
 | `DotRow` | label, outcomes, playerNames, total | Dot matrix for match outcome distribution |
 
-The Analysis component uses internal render functions for each card type: `renderMatchdayReport`, `renderStandingsMovement`, `renderKnockoutVision`, `renderConsensusCard`, `renderPreviewCard`, `renderKnockoutPreview`. Each edition's `cards` array determines which render functions are called.
+The Analysis component uses internal render functions for each card type. Group/pre-knockout cards: `renderMatchdayReport`, `renderStandingsMovement`, `renderKnockoutVision`, `renderConsensusCard`, `renderPreviewCard`, `renderKnockoutPreview`. Post–Round-of-32 cards: `renderSurvivors`, `renderBrokenBrackets`, `renderR16Collisions`, `renderQFQuestion`, `renderTitleRace`, `renderOddsEnds`. Each edition's `cards` array determines which render functions are called.
 
-Two edition flags tune these cards:
+The post-R32 cards share a helper, `computeKO(playerPicks, results, names)`, which resolves the actual R32 field (`computeQualifiers`), the set of R16 survivors (`results.advanced.r16`), the concrete R16 matchups (from the `KNOCKOUT` bracket + `results.koScores` winners), the list of players who filled a bracket, and `countIn`/`whoIn` helpers for pick popularity.
+
+- `survivors` — R16 field vs pool R16 picks: chalk, the zero-bracket "gatecrasher" callout, and the sharp few (with names).
+- `broken-brackets` — champion/finalist/semifinalist picks already eliminated (distinguishing "out in the groups" vs "lost in the R32"), plus still-perfect Final Fours.
+- `r16-collisions` — the 8 concrete R16 ties, flagging any that pit two commonly-picked teams and naming the affected players; an editorial `collisionNote` renders as a highlighted callout.
+- `qf-question` — consensus vs contrarian quarterfinal picks among survivors, plus a "Riding the Longshots" roll-call naming who backs each lightly-owned survivor (≤ half the pool) into the QF.
+- `title-race` — current locked score (`scorePlayer` → group + R32 + R16) plus each player's remaining ceiling (`5×aliveQF + 8×aliveSF + 13×aliveFinal + 21×aliveChamp`); kindly flags anyone whose max can't reach the leader's current score.
+- `odds-ends` — computed tidbits (maverick, people's champion) plus editorial `customTidbits` (array of `{h, p}`).
+
+Two edition flags tune the pre-knockout cards:
 - `includeR32` (on `standings-movement`): when true, the movement card ranks by **total points** (`scorePlayer` → group ×1 + Round-of-32 ×2) instead of raw group-outcome counts, so it matches the Standings tab once the R32 field is known.
-- `knockout-preview` card (`renderKnockoutPreview`): computes the actual R32 field from the snapshot (`computeQualifiers`) and reports champion/semifinal survival, deep picks eliminated in the groups, and R32 "collision" matchups where two commonly-picked teams meet (guaranteed to knock one out).
+- `knockout-preview` card (`renderKnockoutPreview`): a group-stage-complete preview of champion/semifinal survival and R32 collisions.
+
+Edition fields consumed by the post-R32 cards: `collisionNote` (string, highlighted in `r16-collisions`) and `customTidbits` (array of `{h, p}`, rendered in `odds-ends`).
 
 ---
 
@@ -488,6 +499,7 @@ cd wc-pool
 node analytics.mjs round1    # Save/update Round 1 edition (matches 1–24)
 node analytics.mjs round2    # Save/update Round 2 edition (matches 25–48)
 node analytics.mjs round3    # Save/update Round 3 edition (matches 49–72, group stage complete)
+node analytics.mjs r32       # Save/update the post–Round-of-32 edition ("The Cull")
 node analytics.mjs            # Defaults to round1
 ```
 
@@ -495,6 +507,8 @@ node analytics.mjs            # Defaults to round1
 1. Reads all player picks and match results from Firestore
 2. Prints a detailed console report (champion picks, accuracy rankings, consensus analysis, etc.)
 3. Saves a frozen edition to Firestore, preserving existing editions in the array
+
+Each edition freezes exactly the data its cards need. `round3` freezes knockout advancement empty (so its standings-movement is group + R32 only), while the `r32` edition captures the live `advanced` (R16 field) **and** `koScores` (R32 results) so the survivor/collision/title-race cards can compute. The `r32` edition also carries editorial `collisionNote` and `customTidbits`.
 
 **Console output includes:**
 - Champion pick distribution

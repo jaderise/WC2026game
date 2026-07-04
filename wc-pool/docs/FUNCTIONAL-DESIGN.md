@@ -100,7 +100,7 @@ Shows every player's full bracket, allowing comparison across the pool.
 
 ### Tab 6: Analysis
 
-A blog-style analytics page with data visualizations and narratives about the pool's collective predictions. Analysis is organized into **editions** (Round 1, Round 2, Round 3, …), each rendered from a **frozen snapshot** saved to Firestore so the analysis doesn't change as new match results come in. New editions are created by running `analytics.mjs` with a round argument.
+A blog-style analytics page with data visualizations and narratives about the pool's collective predictions. Analysis is organized into **editions** (Round 1, Round 2, Round 3, the Round of 32, …), each rendered from a **frozen snapshot** saved to Firestore so the analysis doesn't change as new match results come in. New editions are created by running `analytics.mjs` with a round argument.
 
 The latest edition is fully expanded at the top of the page. Older editions collapse into a clickable bar with a chevron (▶) indicator — tap to expand and see the full analysis. Each edition displays its published date.
 
@@ -160,6 +160,28 @@ The latest edition is fully expanded at the top of the page. Older editions coll
 
 **Card 4: "The Scores We All Agreed On" — Round 3 Consensus**
 - Same format as the earlier consensus cards, covering matches 49–72
+
+#### Edition 4: "Round of 32 — The Cull"
+
+The first knockout edition, published once the Round of 32 is complete. It reads from a snapshot that captures the Round of 16 field and the R32 match results.
+
+**Card 1: "The Survivors"**
+- The 16 teams still standing vs. how many brackets picked each to reach the Round of 16 — the chalk (unanimous favourites), a bold "Nobody Saw This Coming" callout for any team that advanced in zero brackets, and "The Sharp Few" naming who called the low-owned survivors
+
+**Card 2: "Broken Brackets"**
+- Players whose champion, finalist, or semifinalist pick is already eliminated (noting whether it went out in the groups or lost in the R32), plus the brackets still fully intact
+
+**Card 3: "Collision Course"**
+- The Round of 16 ties that pit two commonly-picked teams together, naming the players guaranteed to lose one, plus editorial callouts
+
+**Card 4: "The Quarterfinal Question"**
+- Consensus vs. contrarian quarterfinal picks among the survivors, and a "Riding the Longshots" roll-call naming exactly who backs each lightly-owned survivor into the last eight
+
+**Card 5: "Is It Still All To Play For?"**
+- The title race: each player's locked score (group + R32 + R16) and their remaining ceiling as points escalate (QF 5, SF 8, Final 13, Champion 21), with a kind note for anyone who can no longer catch the leader
+
+**Card 6: "Odds & Ends"**
+- The little stories in the picks — computed tidbits (the maverick, the people's champion) plus editorial notes (e.g., the DeRise brothers backing Spain, the London connection)
 
 Analysis by Claude is credited on the page.
 
