@@ -1740,8 +1740,17 @@ function Analysis({ editions }) {
         <p style={pStyle}>
           The favourites did their job.
           {chalk.length > 0 && ` ${chalk.map((x) => x.t).join(", ")} were the chalk — ${chalk.filter((x) => x.c === nB).length > 0 ? `${chalk.filter((x) => x.c === nB).map((x) => x.t).join(", ")} appeared in every single bracket. ` : "backed by nearly everyone. "}`}
-          {ghosts.length > 0 && ` But the beautiful game left a calling card: ${ghosts.map((x) => x.t).join(" and ")} crashed the party that nobody invited them to — reaching the last 16 in exactly zero brackets.`}
+          But the beautiful game always leaves a calling card.
         </p>
+        {ghosts.length > 0 && (
+          <div style={{ background: C.ink, color: C.chalk, borderRadius: 6, padding: "14px 16px", margin: "12px 0" }}>
+            <div style={{ fontSize: 11, letterSpacing: ".14em", color: C.sun, fontWeight: 700, marginBottom: 6 }}>NOBODY SAW THIS COMING</div>
+            <div style={{ fontFamily: "Anton, sans-serif", fontSize: 24, lineHeight: 1.05, marginBottom: 4 }}>{ghosts.map((x) => x.t).join(" & ")}</div>
+            <div style={{ fontSize: 13.5, lineHeight: 1.5, color: "#D7DEE9" }}>
+              Not one of the {nB} brackets had {ghosts.length > 1 ? "them" : ghosts[0].t} reaching the Round of 16. The tournament's gatecrasher{ghosts.length > 1 ? "s" : ""} — through anyway, and doing it entirely uninvited.
+            </div>
+          </div>
+        )}
         <h3 style={h3Style}>THE CHALK</h3>
         <HBar data={arr.slice(0, 8).map((x) => ({ label: x.t, value: x.c, color: x.c >= Math.ceil(nB * 0.85) ? C.pitch : x.c >= Math.ceil(nB * 0.4) ? C.ink : C.mute }))} maxVal={nB} showPct total={nB} height={22} />
         {sharp.length > 0 && (<>
@@ -1900,7 +1909,6 @@ function Analysis({ editions }) {
 
   function renderOddsEnds(playerPicks, results, names, customTidbits) {
     const { survivors, bracket, countIn, whoIn } = computeKO(playerPicks, results, names);
-    const ghosts = [...survivors].filter((t) => countIn(t, "r16") === 0);
     const lowSurv = [...survivors].filter((t) => countIn(t, "r16") > 0 && countIn(t, "r16") <= 5);
     let maverick = null, mavCount = -1;
     for (const n of bracket) { const c = lowSurv.filter((t) => (playerPicks[n].advanced?.r16 || []).includes(t)).length; if (c > mavCount) { mavCount = c; maverick = n; } }
@@ -1930,12 +1938,6 @@ function Analysis({ editions }) {
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 2 }}>The people's champion</div>
             <div style={{ fontSize: 13, lineHeight: 1.55 }}>{topChamp[0]} is the most-backed title pick still standing, carried by {topChamp[1]} {topChamp[1] > 1 ? "players" : "player"}: {whoIn(topChamp[0], "champ").join(", ")}.</div>
-          </div>
-        )}
-        {ghosts.length > 0 && (
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 2 }}>The tournament ghost</div>
-            <div style={{ fontSize: 13, lineHeight: 1.55 }}>{ghosts.join(" and ")} — in the last 16, and in exactly zero brackets.</div>
           </div>
         )}
       </div>
