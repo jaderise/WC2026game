@@ -465,7 +465,8 @@ async function main() {
       collisionNote: "Every player left the USA out of their semifinals — Mauricio Pochettino would ask, “why not us?” The twist: Daaaaaaaave and Gary, both Americans, backed Belgium to reach the last four — never guessing the US would be staring them down in Seattle in the sweet 16.",
       customTidbits: [
         { h: "The DeRise brothers back La Roja", p: "Jason, Greg and Eric all put their Spanish heritage on the line — every one of the brothers has Spain lifting the trophy." },
-        { h: "The English contingent is split on the Three Lions", p: "Of the five with English roots, only Andrew and Rebecca backed England to win it all. Mark, Jason and Greg looked elsewhere — France and Spain over their former home." },
+        { h: "The London crew", p: "Six players in this pool first met while living in London — a couple are English through and through (Andrew and Rebecca), the rest were expats who made the city home for a while. Fittingly, only the two Londoners by birth backed England to win it all. The others looked elsewhere: France for Mark, Spain for Jason and Greg, Argentina for Kyle." },
+        { h: "…and they can't shake each other", p: "That same London six have bunched up in the table like an old group chat — right now they hold every spot from 6th to 11th, the whole reunion separated by just nine points." },
       ],
       snapshot: koSnapshot,
     };
