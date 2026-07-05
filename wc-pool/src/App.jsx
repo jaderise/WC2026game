@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { db } from "./firebase";
-import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, onSnapshot, query, orderBy, startAt, endAt, documentId } from "firebase/firestore";
 
 /* =========================================================================
    WORLD CUP 2026 PREDICTION POOL
@@ -181,9 +181,13 @@ async function sSet(key, val) {
 }
 async function sList(prefix) {
   try {
-    const snap = await getDocs(collection(db, "pool"));
+    // Document-ID range query: fetch only the docs whose ID begins with `pfx`,
+    // instead of downloading the whole collection (which includes the large analysis doc
+    // and the other namespace's docs). U+F8FF is a high code point that bounds the prefix.
     const pfx = docId(prefix);
-    return snap.docs.map(d => d.id).filter(id => id.startsWith(pfx)).map(id => id.replaceAll("__", ":"));
+    const q = query(collection(db, "pool"), orderBy(documentId()), startAt(pfx), endAt(pfx + "\uf8ff"));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => d.id).map(id => id.replaceAll("__", ":"));
   } catch (e) { console.error(e); return []; }
 }
 async function sDelete(key) {
@@ -193,8 +197,16 @@ async function sDelete(key) {
 
 /* ---------- Live updates via Firestore onSnapshot ---------- */
 const LIVE_ENABLED = true;
+// Listen only to the docs that change live during the tournament — results (scores,
+// advancement, announcements) and the player registry — instead of the whole collection.
+// This keeps the large analysis doc (and the other namespace's docs) off every client's
+// live stream and cold load; the Analysis tab fetches its own doc on demand.
 function liveSubscribe(onChange) {
-  return onSnapshot(collection(db, "pool"), () => onChange());
+  const unsubs = [
+    onSnapshot(doc(db, "pool", docId(K_RESULTS)), () => onChange()),
+    onSnapshot(doc(db, "pool", docId(K_PLAYERS)), () => onChange()),
+  ];
+  return () => unsubs.forEach((u) => u && u());
 }
 
 const K_RESULTS = NS + "results";
