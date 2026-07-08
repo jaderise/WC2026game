@@ -1945,11 +1945,14 @@ function Analysis({ editions }) {
         <h2 style={h2Style}>IS IT STILL ALL TO PLAY FOR?</h2>
         <p style={{ fontSize: 12, color: C.mute, fontFamily: "'DM Mono', monospace", margin: "4px 0 14px" }}>{stage.lockedLabel} · what's left to win</p>
         <p style={pStyle}>
-          {eliminated.length === 0
-            ? "Yes — wildly so. The whole field is still standing: not a single player is mathematically out of catching the leader. "
-            : `${race.length - eliminated.length} ${race.length - eliminated.length === 1 ? "player is" : "players are"} still live for the title. `}
+          {stage.raceLead !== undefined
+            ? stage.raceLead
+            : (eliminated.length === 0
+              ? "Yes — wildly so. The whole field is still standing: not a single player is mathematically out of catching the leader. "
+              : `${race.length - eliminated.length} ${race.length - eliminated.length === 1 ? "player is" : "players are"} still live for the title. `)}
           The points only get bigger from here ({remaining.map((rk, i) => (<React.Fragment key={rk}>{i > 0 ? ", " : ""}{rk === "champ" ? <b>Champion 21</b> : roundLabels[rk]}</React.Fragment>))}), so the board can flip in an afternoon.
           {" "}<b>{leader.n}</b> leads on {leader.cur}, but the top ten are packed inside just {spread} points{spread < 13 ? " — less than a single correct Final pick" : ""}.
+          {stage.raceTail ? " " + stage.raceTail : ""}
         </p>
         {eliminated.length > 0 && (
           <p style={{ ...pStyle, color: C.mute }}>Out of reach of the leader, but still playing for pride: {eliminated.map((r) => r.n).join(", ")}.</p>
@@ -2103,9 +2106,9 @@ function Analysis({ editions }) {
           if (winners.length === 1) {
             const n = winners[0];
             chaosWins[n] = (chaosWins[n] || 0) + 1;
-            const rec = per[champ].byPlayer[n] || (per[champ].byPlayer[n] = { win: 0, bestScore: -1, other: null });
+            const rec = per[champ].byPlayer[n] || (per[champ].byPlayer[n] = { win: 0, bestScore: -1, other: null, sf: [] });
             rec.win++;
-            if (tot[n] > rec.bestScore) { rec.bestScore = tot[n]; rec.other = [...finSet].find((x) => x !== champ) || null; }
+            if (tot[n] > rec.bestScore) { rec.bestScore = tot[n]; rec.other = [...finSet].find((x) => x !== champ) || null; rec.sf = [...sfSet].sort(); }
           }
         }
       }
@@ -2133,8 +2136,8 @@ function Analysis({ editions }) {
                 <span style={{ fontSize: 11, fontFamily: "'DM Mono', monospace", color: C.mute }}>16 scenarios</span>
               </div>
               {rows.map((r) => { const on = deepOn(t, r.n); return (
-                <div key={r.n} style={{ fontSize: 12.5, color: C.ink, lineHeight: 1.5, paddingLeft: 2 }}>
-                  <b>{r.n}</b> wins the pool in {r.win} of the 16 — best case <b>{r.bestScore}</b>{r.other ? `, with ${t} beating ${r.other} in the final` : ""}{on ? <span style={{ color: C.pitch }}> (rode {t} to the {on})</span> : ""}.
+                <div key={r.n} style={{ fontSize: 12.5, color: C.ink, lineHeight: 1.5, paddingLeft: 2, marginBottom: 3 }}>
+                  <b>{r.n}</b> wins the pool in {r.win} of the 16 — best case <b>{r.bestScore}</b>{on ? <span style={{ color: C.pitch }}> (rode {t} to the {on})</span> : ""}. {r.sf.length ? <span style={{ color: C.mute }}>Last four: {r.sf.join(", ")}{r.other ? `; ${t} beats ${r.other} in the final` : ""}.</span> : null}
                 </div>
               ); })}
               {!rows.length && <div style={{ fontSize: 12.5, color: C.mute }}>Ends in a tie in every branch.</div>}

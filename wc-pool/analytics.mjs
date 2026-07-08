@@ -460,7 +460,7 @@ async function main() {
       title: "Round of 16 — The Elite Eight",
       headline: "THE ELITE EIGHT",
       publishedAt: new Date().toISOString(),
-      stage: { gamesTag: "ROUND OF 16", wonKey: "qf", wonLabel: "quarterfinals", nextKey: "sf", nextLabel: "semifinals", nextTitle: "SEMIFINAL", nextShort: "SF", nextPlace: "last four", lockedLabel: "Group + R32 + R16 + QF locked" },
+      stage: { gamesTag: "ROUND OF 16", wonKey: "qf", wonLabel: "quarterfinals", nextKey: "sf", nextLabel: "semifinals", nextTitle: "SEMIFINAL", nextShort: "SF", nextPlace: "last four", lockedLabel: "Group + R32 + R16 + QF locked", raceLead: "", raceTail: "The gaps are small and the biggest points are still ahead — but dig into the specific scenarios below and some players already have no path left to an outright win." },
       cards: ["survivors", "broken-brackets", "collisions", "question", "title-race", "scenarios", "chaos"],
       scenarioTeams: ["France", "Spain", "England", "Argentina"],
       snapshot: koSnapshot,
