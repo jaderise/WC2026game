@@ -461,7 +461,7 @@ async function main() {
       headline: "THE ELITE EIGHT",
       publishedAt: new Date().toISOString(),
       stage: { gamesTag: "ROUND OF 16", wonKey: "qf", wonLabel: "quarterfinals", nextKey: "sf", nextLabel: "semifinals", nextTitle: "SEMIFINAL", nextShort: "SF", nextPlace: "last four", lockedLabel: "Group + R32 + R16 + QF locked" },
-      cards: ["survivors", "broken-brackets", "collisions", "question", "title-race", "scenarios"],
+      cards: ["survivors", "broken-brackets", "collisions", "question", "title-race", "scenarios", "chaos"],
       scenarioTeams: ["France", "Spain", "England", "Argentina"],
       snapshot: koSnapshot,
     };

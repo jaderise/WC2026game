@@ -2071,6 +2071,81 @@ function Analysis({ editions }) {
     return <>{teams.map((t) => teamCard(t))}</>;
   }
 
+  function renderChaos(playerPicks, results, names) {
+    const ko = results.koScores || {};
+    const bracket = names.filter((n) => (playerPicks[n].advanced?.champ || []).length || (playerPicks[n].advanced?.sf || []).length);
+    const cur = {}; for (const n of bracket) cur[n] = scorePlayer(playerPicks[n], results).total;
+    const qf = KNOCKOUT.filter((m) => m.r === "qf").map((m) => ({ n: m.n, a: ko[m.f1]?.winner, b: ko[m.f2]?.winner }));
+    const sf = KNOCKOUT.filter((m) => m.r === "sf");
+    const fin = KNOCKOUT.find((m) => m.r === "final");
+    if (qf.length !== 4 || qf.some((m) => !m.a || !m.b) || sf.length !== 2 || !fin) return null;
+    const qfTeams = qf.flatMap((m) => [m.a, m.b]);
+    const champBackers = {}; for (const n of bracket) { const c = (playerPicks[n].advanced?.champ || [])[0]; if (c) champBackers[c] = (champBackers[c] || 0) + 1; }
+    const darks = qfTeams.filter((t) => !champBackers[t]);
+    if (!darks.length) return null;
+    const per = {}; darks.forEach((t) => per[t] = { n: 0, winners: {} });
+    const chaosWins = {};
+    for (let q = 0; q < 16; q++) {
+      const qw = {}; qf.forEach((m, i) => { qw[m.n] = ((q >> i) & 1) ? m.b : m.a; });
+      const sfSet = new Set(Object.values(qw));
+      for (let s = 0; s < 4; s++) {
+        const fw = {}; sf.forEach((m, j) => { const cand = [qw[m.f1], qw[m.f2]]; fw[m.n] = ((s >> j) & 1) ? cand[1] : cand[0]; });
+        const finSet = new Set(Object.values(fw));
+        const finalCand = [fw[fin.f1], fw[fin.f2]];
+        for (let fi = 0; fi < 2; fi++) {
+          const champ = fi ? finalCand[1] : finalCand[0];
+          if (!per[champ]) continue;
+          const tot = {};
+          for (const n of bracket) { const a = playerPicks[n].advanced || {}; let x = cur[n]; for (const t of (a.sf || [])) if (sfSet.has(t)) x += 8; for (const t of (a.final || [])) if (finSet.has(t)) x += 13; if ((a.champ || [])[0] === champ) x += 21; tot[n] = x; }
+          const mx = Math.max(...bracket.map((n) => tot[n]));
+          const winners = bracket.filter((n) => tot[n] === mx);
+          per[champ].n++;
+          const key = winners.join(" & ");
+          per[champ].winners[key] = (per[champ].winners[key] || 0) + 1;
+          if (winners.length === 1) chaosWins[winners[0]] = (chaosWins[winners[0]] || 0) + 1;
+        }
+      }
+    }
+    const deep = (t) => ({ sf: bracket.filter((n) => (playerPicks[n].advanced?.sf || []).includes(t)), fin: bracket.filter((n) => (playerPicks[n].advanced?.final || []).includes(t)) });
+    const order = darks.slice().sort((a, b) => Math.max(0, ...Object.values(per[b].winners)) - Math.max(0, ...Object.values(per[a].winners)));
+    const king = Object.entries(chaosWins).sort((a, b) => b[1] - a[1])[0];
+    const totalDark = darks.reduce((s, t) => s + per[t].n, 0);
+    return (
+      <div style={cardStyle}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+          <span style={tagStyle(C.ink)}>SCENARIOS</span><span style={tagStyle(C.red)}>CHAOS</span>
+        </div>
+        <h2 style={h2Style}>THE CHAOS BRACKET</h2>
+        <p style={{ fontSize: 12, color: C.mute, fontFamily: "'DM Mono', monospace", margin: "4px 0 14px" }}>Who wins the pool if a team nobody crowned lifts the trophy</p>
+        <p style={pStyle}>
+          Four of the eight left — {order.join(", ")} — were nobody's champion pick. If one of them shocks the world, the 21 champion points go unclaimed and the pool falls to whoever's already ahead plus anyone who caught a little semifinal or final value on the underdog.
+        </p>
+        {order.map((t) => {
+          const dist = Object.entries(per[t].winners).sort((a, b) => b[1] - a[1]);
+          const d = deep(t);
+          const backers = [...d.sf, ...d.fin.filter((x) => !d.sf.includes(x))];
+          return (
+            <div key={t} style={{ padding: "9px 0", borderBottom: `1px solid ${C.line}` }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                <span style={{ fontWeight: 700, fontSize: 14 }}>{t} win it all</span>
+                <span style={{ fontSize: 11, fontFamily: "'DM Mono', monospace", color: C.mute }}>{per[t].n} of 128</span>
+              </div>
+              <div style={{ fontSize: 12.5, color: C.ink, lineHeight: 1.5, marginTop: 2 }}>
+                Pool winner: {dist.slice(0, 4).map(([w, c], i) => <span key={w}>{i > 0 ? ", " : ""}<b>{w}</b> ({c})</span>)}.
+                {backers.length ? <span style={{ color: C.mute }}> {" "}Backed deep by {backers.join(", ")}.</span> : <span style={{ color: C.mute }}> {" "}Backed deep by nobody — pure points battle.</span>}
+              </div>
+            </div>
+          );
+        })}
+        {king && (
+          <p style={{ ...pStyle, marginTop: 12 }}>
+            <b>{king[0]} is the chaos king</b> — the pool winner in {king[1]} of the {totalDark} dark-horse scenarios. The more the bracket burns, the better {king[0]} does.
+          </p>
+        )}
+      </div>
+    );
+  }
+
   function renderConsensusCard(playerPicks, actualScores, names, roundMatches, tagLabel) {
     const consensus = roundMatches.map((mm) => {
       const outcomes = { H: 0, D: 0, A: 0 };
@@ -2540,6 +2615,9 @@ function Analysis({ editions }) {
                 }
                 if (card === "scenarios") {
                   return <React.Fragment key={ci}>{renderScenarios(playerPicks, snapResults, names, edition.scenarioTeams || (edition.scenarioTeam ? [edition.scenarioTeam] : ["France"]))}</React.Fragment>;
+                }
+                if (card === "chaos") {
+                  return <React.Fragment key={ci}>{renderChaos(playerPicks, snapResults, names)}</React.Fragment>;
                 }
                 if (card === "consensus") {
                   const matchRange = edition.matchRange || [1, 24];
