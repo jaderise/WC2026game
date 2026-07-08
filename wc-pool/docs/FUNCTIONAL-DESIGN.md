@@ -187,7 +187,10 @@ The first knockout edition, published once the Round of 32 is complete. It reads
 
 The second knockout edition, published once the Round of 16 is complete (the eight quarterfinalists are set). Same structure as The Cull, one round deeper: **The Survivors** (the 8 QF teams vs. who backed them), **Broken Brackets**, **Collision Course** (the quarterfinal ties), **The Semifinal Question** (consensus vs. contrarian picks for the last four, with a longshots roll-call), and **Is It Still All To Play For?** (title race with QF points now locked).
 
-In place of Odds & Ends it closes with **scenario analysis** — a set of "Road to Glory" cards, one for each still-standing champion pick (France, Spain, England, Argentina). Each card enumerates all 128 remaining ways the bracket can play out and, for every player who backed that team, shows **how many of those outcomes would make them the overall pool winner** and their best-case path. Players who can no longer win are noted kindly (still cheering their team on for pride).
+In place of Odds & Ends it closes with **scenario analysis**:
+
+- **Road to Glory** — a set of cards, one for each still-standing champion pick (France, Spain, England, Argentina). Each enumerates all 128 remaining ways the bracket can play out and, for every player who backed that team, shows **how many of those outcomes would make them the overall pool winner** and their best-case path. Players who can no longer win are noted kindly (still cheering their team on for pride).
+- **The Chaos Bracket** — the flip side: what happens to the pool if one of the four dark horses nobody crowned (Morocco, Belgium, Norway, Switzerland) lifts the trophy. Since no player claims the champion points, it shows who'd win the pool in each case, each beneficiary's best-case score and required "last four," and names the overall "chaos king" (the player who benefits most from a burning bracket).
 
 Analysis by Claude is credited on the page.
 
