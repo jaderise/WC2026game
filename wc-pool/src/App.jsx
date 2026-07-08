@@ -2083,7 +2083,7 @@ function Analysis({ editions }) {
     const champBackers = {}; for (const n of bracket) { const c = (playerPicks[n].advanced?.champ || [])[0]; if (c) champBackers[c] = (champBackers[c] || 0) + 1; }
     const darks = qfTeams.filter((t) => !champBackers[t]);
     if (!darks.length) return null;
-    const per = {}; darks.forEach((t) => per[t] = { n: 0, winners: {} });
+    const per = {}; darks.forEach((t) => per[t] = { n: 0, byPlayer: {} });
     const chaosWins = {};
     for (let q = 0; q < 16; q++) {
       const qw = {}; qf.forEach((m, i) => { qw[m.n] = ((q >> i) & 1) ? m.b : m.a; });
@@ -2100,14 +2100,18 @@ function Analysis({ editions }) {
           const mx = Math.max(...bracket.map((n) => tot[n]));
           const winners = bracket.filter((n) => tot[n] === mx);
           per[champ].n++;
-          const key = winners.join(" & ");
-          per[champ].winners[key] = (per[champ].winners[key] || 0) + 1;
-          if (winners.length === 1) chaosWins[winners[0]] = (chaosWins[winners[0]] || 0) + 1;
+          if (winners.length === 1) {
+            const n = winners[0];
+            chaosWins[n] = (chaosWins[n] || 0) + 1;
+            const rec = per[champ].byPlayer[n] || (per[champ].byPlayer[n] = { win: 0, bestScore: -1, other: null });
+            rec.win++;
+            if (tot[n] > rec.bestScore) { rec.bestScore = tot[n]; rec.other = [...finSet].find((x) => x !== champ) || null; }
+          }
         }
       }
     }
-    const deep = (t) => ({ sf: bracket.filter((n) => (playerPicks[n].advanced?.sf || []).includes(t)), fin: bracket.filter((n) => (playerPicks[n].advanced?.final || []).includes(t)) });
-    const order = darks.slice().sort((a, b) => Math.max(0, ...Object.values(per[b].winners)) - Math.max(0, ...Object.values(per[a].winners)));
+    const deepOn = (t, n) => (playerPicks[n].advanced?.final || []).includes(t) ? "final" : (playerPicks[n].advanced?.sf || []).includes(t) ? "semis" : null;
+    const order = darks.slice().sort((a, b) => Math.max(0, ...Object.values(per[b].byPlayer).map((r) => r.win)) - Math.max(0, ...Object.values(per[a].byPlayer).map((r) => r.win)));
     const king = Object.entries(chaosWins).sort((a, b) => b[1] - a[1])[0];
     const totalDark = darks.reduce((s, t) => s + per[t].n, 0);
     return (
@@ -2118,22 +2122,22 @@ function Analysis({ editions }) {
         <h2 style={h2Style}>THE CHAOS BRACKET</h2>
         <p style={{ fontSize: 12, color: C.mute, fontFamily: "'DM Mono', monospace", margin: "4px 0 14px" }}>Who wins the pool if a team nobody crowned lifts the trophy</p>
         <p style={pStyle}>
-          Four of the eight left — {order.join(", ")} — were nobody's champion pick. If one of them shocks the world, the 21 champion points go unclaimed and the pool falls to whoever's already ahead plus anyone who caught a little semifinal or final value on the underdog.
+          The bracket can still finish 128 ways. In exactly half of them — <b>64</b> — the champion is one of the four teams nobody backed to win it: {order.join(", ")} (16 scenarios each). When that happens the 21 champion points go unclaimed by everyone, and the pool falls to whoever's already ahead plus anyone who caught semifinal or final value on the underdog. Here's each dark horse's title run and who it crowns.
         </p>
         {order.map((t) => {
-          const dist = Object.entries(per[t].winners).sort((a, b) => b[1] - a[1]);
-          const d = deep(t);
-          const backers = [...d.sf, ...d.fin.filter((x) => !d.sf.includes(x))];
+          const rows = Object.entries(per[t].byPlayer).map(([n, r]) => ({ n, ...r })).sort((a, b) => b.win - a.win || b.bestScore - a.bestScore);
           return (
-            <div key={t} style={{ padding: "9px 0", borderBottom: `1px solid ${C.line}` }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+            <div key={t} style={{ padding: "10px 0", borderBottom: `1px solid ${C.line}` }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 3 }}>
                 <span style={{ fontWeight: 700, fontSize: 14 }}>{t} win it all</span>
-                <span style={{ fontSize: 11, fontFamily: "'DM Mono', monospace", color: C.mute }}>{per[t].n} of 128</span>
+                <span style={{ fontSize: 11, fontFamily: "'DM Mono', monospace", color: C.mute }}>16 scenarios</span>
               </div>
-              <div style={{ fontSize: 12.5, color: C.ink, lineHeight: 1.5, marginTop: 2 }}>
-                Pool winner: {dist.slice(0, 4).map(([w, c], i) => <span key={w}>{i > 0 ? ", " : ""}<b>{w}</b> ({c})</span>)}.
-                {backers.length ? <span style={{ color: C.mute }}> {" "}Backed deep by {backers.join(", ")}.</span> : <span style={{ color: C.mute }}> {" "}Backed deep by nobody — pure points battle.</span>}
-              </div>
+              {rows.map((r) => { const on = deepOn(t, r.n); return (
+                <div key={r.n} style={{ fontSize: 12.5, color: C.ink, lineHeight: 1.5, paddingLeft: 2 }}>
+                  <b>{r.n}</b> wins the pool in {r.win} of the 16 — best case <b>{r.bestScore}</b>{r.other ? `, with ${t} beating ${r.other} in the final` : ""}{on ? <span style={{ color: C.pitch }}> (rode {t} to the {on})</span> : ""}.
+                </div>
+              ); })}
+              {!rows.length && <div style={{ fontSize: 12.5, color: C.mute }}>Ends in a tie in every branch.</div>}
             </div>
           );
         })}
