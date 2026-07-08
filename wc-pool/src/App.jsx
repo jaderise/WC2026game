@@ -2005,6 +2005,69 @@ function Analysis({ editions }) {
     );
   }
 
+  function renderScenarios(playerPicks, results, names, scenarioTeam) {
+    scenarioTeam = scenarioTeam || "France";
+    const ko = results.koScores || {};
+    const bracket = names.filter((n) => (playerPicks[n].advanced?.champ || []).length || (playerPicks[n].advanced?.sf || []).length);
+    const cur = {}; for (const n of bracket) cur[n] = scorePlayer(playerPicks[n], results).total;
+    const qf = KNOCKOUT.filter((m) => m.r === "qf").map((m) => ({ n: m.n, a: ko[m.f1]?.winner, b: ko[m.f2]?.winner }));
+    const sf = KNOCKOUT.filter((m) => m.r === "sf");
+    const fin = KNOCKOUT.find((m) => m.r === "final");
+    if (qf.length !== 4 || qf.some((m) => !m.a || !m.b) || sf.length !== 2 || !fin) return null;
+    const backers = bracket.filter((n) => (playerPicks[n].advanced?.champ || [])[0] === scenarioTeam);
+    if (!backers.length) return null;
+    const res = {}; for (const n of backers) res[n] = { win: 0, best: null, bestScore: -1 };
+    // Enumerate every remaining outcome: 4 QF (2^4) x 2 SF (2^2) x Final (2) = 128.
+    for (let q = 0; q < 16; q++) {
+      const qw = {}; qf.forEach((m, i) => { qw[m.n] = ((q >> i) & 1) ? m.b : m.a; });
+      const sfSet = new Set(Object.values(qw));
+      for (let s = 0; s < 4; s++) {
+        const fw = {}; sf.forEach((m, j) => { const cand = [qw[m.f1], qw[m.f2]]; fw[m.n] = ((s >> j) & 1) ? cand[1] : cand[0]; });
+        const finSet = new Set(Object.values(fw));
+        const finalCand = [fw[fin.f1], fw[fin.f2]];
+        for (let fi = 0; fi < 2; fi++) {
+          const champ = fi ? finalCand[1] : finalCand[0];
+          const tot = {};
+          for (const n of bracket) { const a = playerPicks[n].advanced || {}; let x = cur[n]; for (const t of (a.sf || [])) if (sfSet.has(t)) x += 8; for (const t of (a.final || [])) if (finSet.has(t)) x += 13; if ((a.champ || [])[0] === champ) x += 21; tot[n] = x; }
+          const mx = Math.max(...bracket.map((n) => tot[n]));
+          const winners = bracket.filter((n) => tot[n] === mx);
+          for (const n of backers) { if (tot[n] === mx && winners.length === 1) { res[n].win++; if (tot[n] > res[n].bestScore) { res[n].bestScore = tot[n]; res[n].best = { finSet: [...finSet], champ, score: tot[n] }; } } }
+        }
+      }
+    }
+    const rows = backers.map((n) => ({ n, ...res[n], cur: cur[n] })).sort((a, b) => b.win - a.win || b.cur - a.cur);
+    const live = rows.filter((r) => r.win > 0);
+    return (
+      <div style={cardStyle}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+          <span style={tagStyle(C.ink)}>SCENARIOS</span><span style={tagStyle(C.sun)}>ROAD TO GLORY</span>
+        </div>
+        <h2 style={h2Style}>THE {scenarioTeam.toUpperCase()} FAITHFUL</h2>
+        <p style={{ fontSize: 12, color: C.mute, fontFamily: "'DM Mono', monospace", margin: "4px 0 14px" }}>Every path to the overall title for the {backers.length} who backed {scenarioTeam}</p>
+        <p style={pStyle}>
+          {backers.length} players put their trophy on {scenarioTeam}, and they're still standing. With 128 ways the rest of the bracket can play out, here's each backer's road to winning the pool — and every route runs through a {scenarioTeam} title.
+        </p>
+        {rows.map((r) => {
+          const other = r.best ? r.best.finSet.find((t) => t !== scenarioTeam) : null;
+          return (
+            <div key={r.n} style={{ padding: "9px 0", borderBottom: `1px solid ${C.line}` }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                <span style={{ fontWeight: 700, fontSize: 14 }}>{r.n}</span>
+                <span style={{ fontSize: 11, fontFamily: "'DM Mono', monospace", color: r.win > 0 ? C.pitch : C.mute }}>{r.win > 0 ? `${r.win} of 128 winning paths` : "no path left"}</span>
+              </div>
+              <div style={{ fontSize: 12.5, color: C.ink, lineHeight: 1.5, marginTop: 2 }}>
+                {r.win > 0
+                  ? <>Best case: {scenarioTeam} win it all{other ? <>, beating <b>{other}</b> in the final</> : ""} — {r.win >= 15 ? "he's in the box seat, needing little else to break his way" : "a narrower route, but it's there"}. Tops out at <b>{r.best.score}</b>.</>
+                  : <>Even a {scenarioTeam} triumph won't be enough now — the other deep picks that would carry him are already out. Cheering {scenarioTeam} on for pride.</>}
+              </div>
+            </div>
+          );
+        })}
+        <p style={{ ...pStyle, color: C.mute, marginTop: 12 }}>{live.length} of the {backers.length} {scenarioTeam} backers can still win the whole thing. {rows[0] && rows[0].win > 0 ? `${rows[0].n} has the most routes (${rows[0].win}).` : ""}</p>
+      </div>
+    );
+  }
+
   function renderConsensusCard(playerPicks, actualScores, names, roundMatches, tagLabel) {
     const consensus = roundMatches.map((mm) => {
       const outcomes = { H: 0, D: 0, A: 0 };
@@ -2471,6 +2534,9 @@ function Analysis({ editions }) {
                 }
                 if (card === "odds-ends") {
                   return <React.Fragment key={ci}>{renderOddsEnds(playerPicks, snapResults, names, edition.customTidbits, edition.stage)}</React.Fragment>;
+                }
+                if (card === "scenarios") {
+                  return <React.Fragment key={ci}>{renderScenarios(playerPicks, snapResults, names, edition.scenarioTeam)}</React.Fragment>;
                 }
                 if (card === "consensus") {
                   const matchRange = edition.matchRange || [1, 24];
