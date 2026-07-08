@@ -445,7 +445,27 @@ async function main() {
   };
 
   let newEdition;
-  if (editionArg === "r32") {
+  if (editionArg === "r16") {
+    // Post–Round of 16 edition: capture the QF field (advanced.qf) + koScores.
+    const koSnapshot = {
+      playerPicks: snapPicks,
+      results: {
+        scores: results.scores || {},
+        advanced: results.advanced || {},
+        koScores: results.koScores || {},
+      },
+    };
+    newEdition = {
+      id: "ko-r16",
+      title: "Round of 16 — The Elite Eight",
+      headline: "THE ELITE EIGHT",
+      publishedAt: new Date().toISOString(),
+      stage: { gamesTag: "ROUND OF 16", wonKey: "qf", wonLabel: "quarterfinals", nextKey: "sf", nextLabel: "semifinals", nextTitle: "SEMIFINAL", nextShort: "SF", nextPlace: "last four", lockedLabel: "Group + R32 + R16 + QF locked" },
+      cards: ["survivors", "broken-brackets", "collisions", "question", "title-race", "odds-ends"],
+      customTidbits: [],
+      snapshot: koSnapshot,
+    };
+  } else if (editionArg === "r32") {
     // Post–Round of 32 edition: capture the R16 field (advanced.r16) and the R32 match
     // results (koScores) so the survivor/collision/title-race cards can be computed.
     const koSnapshot = {
