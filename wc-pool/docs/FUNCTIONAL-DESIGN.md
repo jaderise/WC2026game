@@ -183,6 +183,12 @@ The first knockout edition, published once the Round of 32 is complete. It reads
 **Card 6: "Odds & Ends"**
 - The little stories in the picks — computed tidbits (the maverick, the people's champion) plus editorial notes (e.g., the DeRise brothers backing Spain, the London connection)
 
+#### Edition 5: "Round of 16 — The Elite Eight"
+
+The second knockout edition, published once the Round of 16 is complete (the eight quarterfinalists are set). Same structure as The Cull, one round deeper: **The Survivors** (the 8 QF teams vs. who backed them), **Broken Brackets**, **Collision Course** (the quarterfinal ties), **The Semifinal Question** (consensus vs. contrarian picks for the last four, with a longshots roll-call), and **Is It Still All To Play For?** (title race with QF points now locked).
+
+In place of Odds & Ends it closes with **scenario analysis** — a set of "Road to Glory" cards, one for each still-standing champion pick (France, Spain, England, Argentina). Each card enumerates all 128 remaining ways the bracket can play out and, for every player who backed that team, shows **how many of those outcomes would make them the overall pool winner** and their best-case path. Players who can no longer win are noted kindly (still cheering their team on for pride).
+
 Analysis by Claude is credited on the page.
 
 ### Tab 7: Updates
@@ -331,6 +337,7 @@ The app automatically fetches live match scores from the openfootball project on
 - Large tap targets for score inputs and team selection buttons
 - Sticky toast notifications for save confirmations
 - Tab bar at the top wraps into rows of pill-style buttons so all tabs stay visible on narrow screens (2 rows of 4 on a phone, a single row on wider screens)
+- Fast first load: the app fetches only the data the opening screen needs, so cold-start time stays small and doesn't grow as more analysis editions are published (the analysis loads only when the Analysis tab is opened)
 
 ---
 

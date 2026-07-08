@@ -198,12 +198,15 @@ const docId = (key) => key.replaceAll(":", "__");
 Each edition freezes all player picks and match results at the time `analytics.mjs` is run. The Analysis tab renders cards from each edition's frozen data, so analysis doesn't change as new match results come in. Editions are stored newest-first; the latest edition renders fully expanded while older editions are collapsed behind a clickable chevron.
 
 **Edition fields:**
-- `id` — Unique identifier (e.g., "round1", "round2")
+- `id` — Unique identifier (e.g., "round1", "ko-r16")
 - `title` — Display title shown in the edition header
 - `headline` — Large heading for the matchday report card (unique per edition)
 - `matchRange` — `[first, last]` match numbers for this edition's analysis
 - `previewRange` — `[first, last]` match numbers for the look-ahead preview card
-- `cards` — Array of card types to render: `"matchday"`, `"standings-movement"`, `"knockout-vision"`, `"consensus"`, `"preview"`
+- `cards` — Array of card types to render: `"matchday"`, `"standings-movement"`, `"knockout-vision"`, `"consensus"`, `"preview"`, `"survivors"`, `"broken-brackets"`, `"collisions"`, `"question"`, `"title-race"`, `"odds-ends"`, `"scenarios"`
+- `stage` — (knockout editions) descriptor driving the generic knockout cards: `wonKey`/`wonLabel` (round the survivors reached), `nextKey`/`nextLabel`/`nextTitle`/`nextShort`/`nextPlace` (round they play toward), `gamesTag`, `lockedLabel`. Omitted editions fall back to `DEFAULT_STAGE` (post-Round-of-32 semantics).
+- `scenarioTeams` — (scenarios card) array of champion teams to build "Road to Glory" cards for
+- `collisionNote` / `customTidbits` — optional editorial content for the collisions / odds-ends cards
 
 ### Firestore Security Rules
 
@@ -234,8 +237,9 @@ async function sSet(key, val)
 // Writes {value: val, key: key} to pool/{docId(key)}.
 
 async function sList(prefix)
-// Reads ALL docs in pool collection, filters by prefix, returns matching keys.
-// Note: reads entire collection each call — fine for <100 docs.
+// Firestore document-ID range query (orderBy(documentId()) + startAt(pfx)/endAt(pfx+"")).
+// Fetches ONLY docs whose ID begins with the prefix — not the whole collection — so the large
+// analysis doc and the other namespace's docs are never downloaded. No custom index needed.
 
 async function sDelete(key)
 // Deletes pool/{docId(key)}.
@@ -249,14 +253,19 @@ async function sDelete(key)
 const LIVE_ENABLED = true;
 
 function liveSubscribe(onChange) {
-  return onSnapshot(collection(db, "pool"), () => onChange());
+  const unsubs = [
+    onSnapshot(doc(db, "pool", docId(K_RESULTS)), () => onChange()),
+    onSnapshot(doc(db, "pool", docId(K_PLAYERS)), () => onChange()),
+  ];
+  return () => unsubs.forEach((u) => u && u());
 }
 ```
 
-- Subscribes to the entire `pool` collection
-- Any document change triggers a full refresh of results, players, and standings
-- All connected clients see updates within seconds
-- Subscription is cleaned up on component unmount
+- Subscribes to just the two documents that change live during the tournament — `results` (scores, advancement, announcements) and the `players` registry — **not** the whole collection.
+- A change to either triggers a refresh of results, players, and standings; standings recompute from the results-doc listener.
+- Cleaned up on component unmount.
+
+**Why targeted listeners (cold-load performance):** a collection-wide `onSnapshot`/`getDocs` downloads *every* document on first load, including the analysis document — which grows ~35 KB per published edition and had reached ~136 KB. Combined with `sList`'s document-ID range query, cold load dropped from ~319 KB to ~40 KB and no longer grows each round. The analysis document is fetched lazily (`sGet(K_ANALYSIS)`) only when the Analysis tab is opened. Trade-off: other clients no longer live-update on a *player pick* edit (moot post-deadline, since picks are locked).
 
 ---
 
@@ -402,22 +411,25 @@ Only the outcome matters (H/D/A), not the exact score.
 | `HBar` | data, maxVal, barColor, height, showPct, total | Horizontal bar chart |
 | `DotRow` | label, outcomes, playerNames, total | Dot matrix for match outcome distribution |
 
-The Analysis component uses internal render functions for each card type. Group/pre-knockout cards: `renderMatchdayReport`, `renderStandingsMovement`, `renderKnockoutVision`, `renderConsensusCard`, `renderPreviewCard`, `renderKnockoutPreview`. Post–Round-of-32 cards: `renderSurvivors`, `renderBrokenBrackets`, `renderR16Collisions`, `renderQFQuestion`, `renderTitleRace`, `renderOddsEnds`. Each edition's `cards` array determines which render functions are called.
+The Analysis component uses internal render functions for each card type. Group/pre-knockout cards: `renderMatchdayReport`, `renderStandingsMovement`, `renderKnockoutVision`, `renderConsensusCard`, `renderPreviewCard`, `renderKnockoutPreview`. Knockout cards: `renderSurvivors`, `renderBrokenBrackets`, `renderCollisions`, `renderQuestion`, `renderTitleRace`, `renderOddsEnds`, `renderScenarios`. Each edition's `cards` array determines which render functions are called.
 
-The post-R32 cards share a helper, `computeKO(playerPicks, results, names)`, which resolves the actual R32 field (`computeQualifiers`), the set of R16 survivors (`results.advanced.r16`), the concrete R16 matchups (from the `KNOCKOUT` bracket + `results.koScores` winners), the list of players who filled a bracket, and `countIn`/`whoIn` helpers for pick popularity.
+**Stage-driven knockout cards.** The knockout cards are generic — driven by the edition's `stage` descriptor rather than hardcoded round keys — so the same code serves each knockout edition (post-R32 = "Round of 32 — The Cull", post-R16 = "Round of 16 — The Elite Eight", and future rounds). `stage.wonKey` is the round the survivors reached; `stage.nextKey` is the round they play toward. Editions without a `stage` fall back to `DEFAULT_STAGE` (post-R32 semantics), so the frozen R32 edition still renders identically. Card ids `"collisions"`/`"question"` are the generic forms; `"r16-collisions"`/`"qf-question"` remain as aliases for the frozen R32 edition.
+
+These cards share a helper, `computeKO(playerPicks, results, names, stage)`, which resolves the actual R32 field (`computeQualifiers`), the survivor set (`results.advanced[stage.wonKey]`), the upcoming matchups (`KNOCKOUT` round `stage.wonKey` + `results.koScores` winners), the bracket-filling players, `countIn`/`whoIn` popularity helpers, and `elimWhere(team)` (where a team was eliminated).
+
+**`renderScenarios`** enumerates every remaining bracket outcome (4 QF × 2 SF × 1 Final = **128 scenarios**) from the snapshot. For each champion team in the edition's `scenarioTeams`, it renders a "Road to Glory" card listing that team's backers with the count of the 128 outcomes that make them the sole pool winner, plus each one's best-case path. Fully deterministic from the frozen snapshot.
 
 - `survivors` — R16 field vs pool R16 picks: chalk, the zero-bracket "gatecrasher" callout, and the sharp few (with names).
 - `broken-brackets` — champion/finalist/semifinalist picks already eliminated (distinguishing "out in the groups" vs "lost in the R32"), plus still-perfect Final Fours.
 - `r16-collisions` — the 8 concrete R16 ties, flagging any that pit two commonly-picked teams and naming the affected players; an editorial `collisionNote` renders as a highlighted callout.
 - `qf-question` — consensus vs contrarian quarterfinal picks among survivors, plus a "Riding the Longshots" roll-call naming who backs each lightly-owned survivor (≤ half the pool) into the QF.
-- `title-race` — current locked score (`scorePlayer` → group + R32 + R16) plus each player's remaining ceiling (`5×aliveQF + 8×aliveSF + 13×aliveFinal + 21×aliveChamp`); kindly flags anyone whose max can't reach the leader's current score.
+- `title-race` — current locked score (`scorePlayer`) plus each player's remaining ceiling (points × still-alive picks over the rounds after `stage.wonKey`); kindly flags anyone whose max can't reach the leader's current score.
 - `odds-ends` — computed tidbits (maverick, people's champion) plus editorial `customTidbits` (array of `{h, p}`).
+- `scenarios` — the 128-outcome "Road to Glory" analysis, one card per team in `scenarioTeams`.
 
-Two edition flags tune the pre-knockout cards:
-- `includeR32` (on `standings-movement`): when true, the movement card ranks by **total points** (`scorePlayer` → group ×1 + Round-of-32 ×2) instead of raw group-outcome counts, so it matches the Standings tab once the R32 field is known.
-- `knockout-preview` card (`renderKnockoutPreview`): a group-stage-complete preview of champion/semifinal survival and R32 collisions.
-
-Edition fields consumed by the post-R32 cards: `collisionNote` (string, highlighted in `r16-collisions`) and `customTidbits` (array of `{h, p}`, rendered in `odds-ends`).
+Other flags:
+- `includeR32` (on `standings-movement`): rank by **total points** (group ×1 + Round-of-32 ×2) instead of raw group-outcome counts, so it matches the Standings tab once the R32 field is known.
+- `knockout-preview` (`renderKnockoutPreview`): a group-stage-complete preview of champion/semifinal survival and R32 collisions.
 
 ---
 
@@ -500,6 +512,7 @@ node analytics.mjs round1    # Save/update Round 1 edition (matches 1–24)
 node analytics.mjs round2    # Save/update Round 2 edition (matches 25–48)
 node analytics.mjs round3    # Save/update Round 3 edition (matches 49–72, group stage complete)
 node analytics.mjs r32       # Save/update the post–Round-of-32 edition ("The Cull")
+node analytics.mjs r16       # Save/update the post–Round-of-16 edition ("The Elite Eight")
 node analytics.mjs            # Defaults to round1
 ```
 
