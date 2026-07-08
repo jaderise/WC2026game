@@ -462,7 +462,7 @@ async function main() {
       publishedAt: new Date().toISOString(),
       stage: { gamesTag: "ROUND OF 16", wonKey: "qf", wonLabel: "quarterfinals", nextKey: "sf", nextLabel: "semifinals", nextTitle: "SEMIFINAL", nextShort: "SF", nextPlace: "last four", lockedLabel: "Group + R32 + R16 + QF locked" },
       cards: ["survivors", "broken-brackets", "collisions", "question", "title-race", "scenarios"],
-      scenarioTeam: "France",
+      scenarioTeams: ["France", "Spain", "England", "Argentina"],
       snapshot: koSnapshot,
     };
   } else if (editionArg === "r32") {
