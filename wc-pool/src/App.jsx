@@ -1772,8 +1772,9 @@ function Analysis({ editions }) {
         <p style={pStyle}>
           The favourites did their job.
           {chalk.length > 0 && ` ${chalk.map((x) => x.t).join(", ")} were the chalk — ${chalk.filter((x) => x.c === nB).length > 0 ? `${chalk.filter((x) => x.c === nB).map((x) => x.t).join(", ")} appeared in every single bracket. ` : "backed by nearly everyone. "}`}
-          But the beautiful game always leaves a calling card.
+          {ghosts.length > 0 ? "But the beautiful game always leaves a calling card." : ""}
         </p>
+        {stage.note && <p style={pStyle}>{stage.note}</p>}
         {ghosts.length > 0 && (
           <div style={{ background: C.ink, color: C.chalk, borderRadius: 6, padding: "14px 16px", margin: "12px 0" }}>
             <div style={{ fontSize: 11, letterSpacing: ".14em", color: C.sun, fontWeight: 700, marginBottom: 6 }}>NOBODY SAW THIS COMING</div>
@@ -1814,18 +1815,24 @@ function Analysis({ editions }) {
       else if ((a.sf || []).length === 4 && champ) intact.push({ n, champ });
     }
     const champAlive = bracket.filter((n) => { const c = (playerPicks[n].advanced?.champ || [])[0]; return c && survivors.has(c); }).length;
+    // When stage.newBreaksRound is set, focus only on picks that fell in THIS round.
+    const shown = stage.newBreaksRound
+      ? broken.map((b) => ({ n: b.n, dead: b.dead.filter((d) => d.where === "lost in the " + stage.newBreaksRound) })).filter((b) => b.dead.length)
+      : broken;
     return (
       <div style={cardStyle}>
         <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
           <span style={tagStyle(C.ink)}>{stage.gamesTag}</span><span style={tagStyle(C.red)}>DAMAGE</span>
         </div>
         <h2 style={h2Style}>BROKEN BRACKETS</h2>
-        <p style={{ fontSize: 12, color: C.mute, fontFamily: "'DM Mono', monospace", margin: "4px 0 14px" }}>Whose deep picks are already gone</p>
+        <p style={{ fontSize: 12, color: C.mute, fontFamily: "'DM Mono', monospace", margin: "4px 0 14px" }}>{stage.newBreaksRound ? "The fresh damage this round" : "Whose deep picks are already gone"}</p>
         <p style={pStyle}>
-          {broken.length > 0 ? `${broken.length} ${broken.length > 1 ? "brackets are carrying damage" : "bracket is carrying damage"} — a semifinalist or better already eliminated. Painful, but the points still to come are big enough that most are far from done.` : "Remarkably, not a single deep pick has fallen yet."}
-          {champAlive === bracket.length && ` And here's the kicker — every player's champion pick is still breathing.`}
+          {stage.brokenNote
+            ? stage.brokenNote
+            : <>{broken.length > 0 ? `${broken.length} ${broken.length > 1 ? "brackets are carrying damage" : "bracket is carrying damage"} — a semifinalist or better already eliminated. Painful, but the points still to come are big enough that most are far from done.` : "Remarkably, not a single deep pick has fallen yet."}
+          {champAlive === bracket.length ? ` And here's the kicker — every player's champion pick is still breathing.` : ""}</>}
         </p>
-        {broken.map((b) => (
+        {shown.map((b) => (
           <div key={b.n} style={{ padding: "7px 0", borderBottom: `1px solid ${C.line}`, fontSize: 13 }}>
             <span style={{ fontWeight: 700 }}>{b.n}</span>: {b.dead.map((d, i) => (
               <span key={i}>{i > 0 ? "; " : " "}<span style={{ color: C.red, fontWeight: 600 }}>{d.t}</span> <span style={{ fontSize: 11, color: C.mute }}>({d.level}, {d.where})</span></span>
@@ -2121,6 +2128,51 @@ function Analysis({ editions }) {
             </div>
           </div>
         ))}
+      </div>
+    );
+  }
+
+  function renderLeaderboard(playerPicks, results, names, note) {
+    const adv = results.advanced || {};
+    const Ssf = new Set(adv.sf || []);
+    const { bracket, cur, scenarios } = computeOutcomes(playerPicks, results, names);
+    const total = scenarios.length;
+    const paths = {}; for (const n of bracket) paths[n] = 0;
+    for (const sc of scenarios) { const mx = Math.max(...bracket.map((n) => sc.tot[n])); const w = bracket.filter((n) => sc.tot[n] === mx); if (w.length === 1) paths[w[0]]++; }
+    const sfPts = (n) => (playerPicks[n].advanced?.sf || []).filter((t) => Ssf.has(t)).length * 8;
+    const rows = bracket.map((n) => ({ n, cur: cur[n], prev: cur[n] - sfPts(n), paths: paths[n] }));
+    const byPrev = [...rows].sort((a, b) => b.prev - a.prev); const prevRank = {}; byPrev.forEach((r, i) => prevRank[r.n] = i + 1);
+    const byCur = [...rows].sort((a, b) => b.cur - a.cur); byCur.forEach((r, i) => r.rank = i + 1);
+    return (
+      <div style={cardStyle}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+          <span style={tagStyle(C.ink)}>STANDINGS</span><span style={tagStyle(C.pitch)}>THE TABLE</span>
+        </div>
+        <h2 style={h2Style}>THE STANDINGS</h2>
+        <p style={{ fontSize: 12, color: C.mute, fontFamily: "'DM Mono', monospace", margin: "4px 0 14px" }}>Points now, movement since the Round of 16, and paths to the title</p>
+        {note && <p style={pStyle}>{note}</p>}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: 10.5, color: C.mute, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: ".08em", borderBottom: `2px solid ${C.line}` }}>
+          <div style={{ width: 24, textAlign: "center" }}>#</div>
+          <div style={{ flex: 1 }}>Player</div>
+          <div style={{ width: 40, textAlign: "right" }}>Pts</div>
+          <div style={{ width: 44, textAlign: "right" }}>Move</div>
+          <div style={{ width: 48, textAlign: "right" }}>Paths</div>
+        </div>
+        {byCur.map((r) => {
+          const mv = prevRank[r.n] - r.rank;
+          const arrow = mv > 0 ? "▲" : mv < 0 ? "▼" : "—";
+          const col = mv > 0 ? C.pitch : mv < 0 ? C.red : C.mute;
+          return (
+            <div key={r.n} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: `1px solid ${C.line}` }}>
+              <div style={{ width: 24, textAlign: "center", fontFamily: "Anton, sans-serif", fontSize: 15 }}>{r.rank}</div>
+              <div style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{r.n}</div>
+              <div style={{ width: 40, textAlign: "right", fontFamily: "'DM Mono', monospace", fontSize: 13 }}>{r.cur}</div>
+              <div style={{ width: 44, textAlign: "right", fontFamily: "'DM Mono', monospace", fontSize: 12, color: col }}>{arrow}{mv !== 0 ? Math.abs(mv) : ""}</div>
+              <div style={{ width: 48, textAlign: "right", fontFamily: "'DM Mono', monospace", fontSize: 13, fontWeight: 700, color: r.paths > 0 ? C.ink : C.mute }}>{r.paths}</div>
+            </div>
+          );
+        })}
+        <p style={{ fontSize: 11, color: C.mute, marginTop: 8 }}>Move = places gained or lost since the Round-of-16 totals. Paths = how many of the {total} remaining outcomes crown that player.</p>
       </div>
     );
   }
@@ -2679,6 +2731,9 @@ function Analysis({ editions }) {
                 }
                 if (card === "scenario-table") {
                   return <React.Fragment key={ci}>{renderScenarioTable(playerPicks, snapResults, names)}</React.Fragment>;
+                }
+                if (card === "leaderboard") {
+                  return <React.Fragment key={ci}>{renderLeaderboard(playerPicks, snapResults, names, edition.leaderboardNote)}</React.Fragment>;
                 }
                 if (card === "consensus") {
                   const matchRange = edition.matchRange || [1, 24];

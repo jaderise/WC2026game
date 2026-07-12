@@ -460,9 +460,14 @@ async function main() {
       title: "Quarterfinals — The Final Four",
       headline: "THE FINAL FOUR",
       publishedAt: new Date().toISOString(),
-      stage: { gamesTag: "QUARTERFINALS", wonKey: "sf", wonLabel: "semifinals", nextKey: "final", nextLabel: "final", nextTitle: "FINAL", nextShort: "FINAL", nextPlace: "final", lockedLabel: "Group + R32 + R16 + QF locked", raceLead: "", raceTail: "The gaps at the top are tiny — but with only the semifinals and final left, the Road to Glory cards below show the door has already closed for several players." },
-      cards: ["survivors", "broken-brackets", "collisions", "question", "title-race", "scenarios", "scenario-table"],
-      scenarioTeams: ["France", "Spain", "England", "Argentina"],
+      stage: {
+        gamesTag: "QUARTERFINALS", wonKey: "sf", wonLabel: "semifinals", nextKey: "final", nextLabel: "final", nextTitle: "FINAL", nextShort: "FINAL", nextPlace: "final", lockedLabel: "Group + R32 + R16 + QF locked",
+        note: "No surprises at all this time: the last four are the four most-backed teams in the pool — and, as it happens, the top four sides in the FIFA World Rankings. Chalk, all the way to the semifinals.",
+        newBreaksRound: "quarterfinals",
+        brokenNote: "Chaos never came. The four dark horses — Morocco, Belgium, Norway and Switzerland — were all knocked out in the quarterfinals, and with them went the last long-shot hopes. The only fresh damage is to the brackets that had one of them going deep:",
+      },
+      cards: ["survivors", "broken-brackets", "scenario-table", "leaderboard"],
+      leaderboardNote: "A word on Brent: he's led wire-to-wire and even nailed all four semifinalists — yet he holds just one path to the title. The culprit is the draw. Brent had France and Spain meeting in the final, with France lifting the trophy — but the bracket sends the two of them at each other in the semifinals. Only one can reach the final, so his dream two-favourite final simply can't happen. In any ending where France do go all the way, rivals who paired France with the actual other finalist (England or Argentina) leap above him. His single winning path is the awkward one — Argentina beating Spain in the final: he banks Spain as a finalist, and because France never lift the trophy, the France crowd can't overtake him.",
       snapshot: koSnapshot,
     };
   } else if (editionArg === "r16") {
