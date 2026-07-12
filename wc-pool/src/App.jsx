@@ -2087,6 +2087,44 @@ function Analysis({ editions }) {
     return <>{teams.map((t) => teamCard(t))}</>;
   }
 
+  // Ledger of every remaining outcome (field result -> pool standings). Only shown when the
+  // remaining bracket is small enough to be readable (<= 8 outcomes, i.e. post-QF onward).
+  function renderScenarioTable(playerPicks, results, names) {
+    const ko = results.koScores || {};
+    const { bracket, scenarios } = computeOutcomes(playerPicks, results, names);
+    if (!scenarios.length || scenarios.length > 8) return null;
+    const sfMatches = KNOCKOUT.filter((m) => m.r === "sf").map((m) => ({ a: ko[m.f1]?.winner, b: ko[m.f2]?.winner }));
+    if (sfMatches.some((m) => !m.a || !m.b)) return null;
+    const rows = scenarios.map((sc) => {
+      const ranked = bracket.map((n) => ({ n, x: sc.tot[n] })).sort((a, b) => b.x - a.x);
+      const other = sc.finalists.find((t) => t !== sc.champ);
+      const semis = sfMatches.map((m, i) => { const adv = sc.finalists[i]; const lose = adv === m.a ? m.b : m.a; return `${adv} beat ${lose}`; });
+      return { finalists: sc.finalists, champ: sc.champ, other, semis, ranked };
+    }).sort((a, b) => (a.finalists[0] + a.finalists[1] + a.champ).localeCompare(b.finalists[0] + b.finalists[1] + b.champ));
+    return (
+      <div style={cardStyle}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+          <span style={tagStyle(C.ink)}>SCENARIOS</span><span style={tagStyle(C.pitch)}>EVERY ENDING</span>
+        </div>
+        <h2 style={h2Style}>THE EIGHT ENDINGS</h2>
+        <p style={{ fontSize: 12, color: C.mute, fontFamily: "'DM Mono', monospace", margin: "4px 0 14px" }}>Every remaining outcome — on the field and on the leaderboard</p>
+        <p style={pStyle}>
+          Just two semifinals and a final stand between here and the trophy — {scenarios.length} possible endings in all. Here's what each does to our pool.
+        </p>
+        {rows.map((r, i) => (
+          <div key={i} style={{ background: C.paper, borderRadius: 6, padding: "10px 12px", marginBottom: 8, borderLeft: `4px solid ${C.pitch}` }}>
+            <div style={{ fontSize: 13.5, fontWeight: 700 }}>{r.champ} beat {r.other} in the final</div>
+            <div style={{ fontSize: 11.5, color: C.mute, marginTop: 1 }}>Semis: {r.semis.join(" · ")}</div>
+            <div style={{ fontSize: 12.5, marginTop: 4 }}>
+              🏆 <b>{r.ranked[0].n}</b> wins the pool on <b>{r.ranked[0].x}</b>
+              <span style={{ color: C.mute }}> · 2nd {r.ranked[1].n} {r.ranked[1].x} · 3rd {r.ranked[2].n} {r.ranked[2].x}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   function renderChaos(playerPicks, results, names) {
     const ko = results.koScores || {};
     const bracket = names.filter((n) => (playerPicks[n].advanced?.champ || []).length || (playerPicks[n].advanced?.sf || []).length);
@@ -2638,6 +2676,9 @@ function Analysis({ editions }) {
                 }
                 if (card === "chaos") {
                   return <React.Fragment key={ci}>{renderChaos(playerPicks, snapResults, names)}</React.Fragment>;
+                }
+                if (card === "scenario-table") {
+                  return <React.Fragment key={ci}>{renderScenarioTable(playerPicks, snapResults, names)}</React.Fragment>;
                 }
                 if (card === "consensus") {
                   const matchRange = edition.matchRange || [1, 24];

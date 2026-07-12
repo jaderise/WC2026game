@@ -461,7 +461,7 @@ async function main() {
       headline: "THE FINAL FOUR",
       publishedAt: new Date().toISOString(),
       stage: { gamesTag: "QUARTERFINALS", wonKey: "sf", wonLabel: "semifinals", nextKey: "final", nextLabel: "final", nextTitle: "FINAL", nextShort: "FINAL", nextPlace: "final", lockedLabel: "Group + R32 + R16 + QF locked", raceLead: "", raceTail: "The gaps at the top are tiny — but with only the semifinals and final left, the Road to Glory cards below show the door has already closed for several players." },
-      cards: ["survivors", "broken-brackets", "collisions", "question", "title-race", "scenarios"],
+      cards: ["survivors", "broken-brackets", "collisions", "question", "title-race", "scenarios", "scenario-table"],
       scenarioTeams: ["France", "Spain", "England", "Argentina"],
       snapshot: koSnapshot,
     };
