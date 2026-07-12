@@ -445,7 +445,27 @@ async function main() {
   };
 
   let newEdition;
-  if (editionArg === "r16") {
+  if (editionArg === "qf") {
+    // Post–Quarterfinal edition: capture the SF field (advanced.sf) + koScores.
+    const koSnapshot = {
+      playerPicks: snapPicks,
+      results: {
+        scores: results.scores || {},
+        advanced: results.advanced || {},
+        koScores: results.koScores || {},
+      },
+    };
+    newEdition = {
+      id: "ko-qf",
+      title: "Quarterfinals — The Final Four",
+      headline: "THE FINAL FOUR",
+      publishedAt: new Date().toISOString(),
+      stage: { gamesTag: "QUARTERFINALS", wonKey: "sf", wonLabel: "semifinals", nextKey: "final", nextLabel: "final", nextTitle: "FINAL", nextShort: "FINAL", nextPlace: "final", lockedLabel: "Group + R32 + R16 + QF locked", raceLead: "", raceTail: "The gaps at the top are tiny — but with only the semifinals and final left, the Road to Glory cards below show the door has already closed for several players." },
+      cards: ["survivors", "broken-brackets", "collisions", "question", "title-race", "scenarios"],
+      scenarioTeams: ["France", "Spain", "England", "Argentina"],
+      snapshot: koSnapshot,
+    };
+  } else if (editionArg === "r16") {
     // Post–Round of 16 edition: capture the QF field (advanced.qf) + koScores.
     const koSnapshot = {
       playerPicks: snapPicks,

@@ -2008,33 +2008,46 @@ function Analysis({ editions }) {
     );
   }
 
-  function renderScenarios(playerPicks, results, names, teams) {
-    teams = teams && teams.length ? teams : ["France"];
+  // Generic remaining-bracket enumerator: enumerates every outcome of the undecided knockout
+  // games (from the current frontier forward) and scores each player. Post-R16 that's 128
+  // (QF+SF+Final); post-QF it's 8 (SF+Final). Locked rounds are already in `cur`.
+  function computeOutcomes(playerPicks, results, names) {
     const ko = results.koScores || {};
+    const adv = results.advanced || {};
     const bracket = names.filter((n) => (playerPicks[n].advanced?.champ || []).length || (playerPicks[n].advanced?.sf || []).length);
     const cur = {}; for (const n of bracket) cur[n] = scorePlayer(playerPicks[n], results).total;
-    const qf = KNOCKOUT.filter((m) => m.r === "qf").map((m) => ({ n: m.n, a: ko[m.f1]?.winner, b: ko[m.f2]?.winner }));
-    const sf = KNOCKOUT.filter((m) => m.r === "sf");
-    const fin = KNOCKOUT.find((m) => m.r === "final");
-    if (qf.length !== 4 || qf.some((m) => !m.a || !m.b) || sf.length !== 2 || !fin) return null;
-    // Enumerate every remaining outcome once: 4 QF (2^4) x 2 SF (2^2) x Final (2) = 128.
+    const roundOrder = { r16: 0, qf: 1, sf: 2, final: 3 };
+    const feedsKey = { r16: "qf", qf: "sf", sf: "final", final: "champ" };
+    const games = KNOCKOUT.filter((m) => roundOrder[m.r] !== undefined);
+    const undecided = games.filter((m) => !(ko[m.n] && ko[m.n].winner)).sort((a, b) => roundOrder[a.r] - roundOrder[b.r] || a.n - b.n);
+    const openKeys = ["qf", "sf", "final", "champ"].filter((k) => !((adv[k] || []).length));
+    const bits = undecided.length;
+    if (!bits || bits > 12) return { bracket, cur, scenarios: [] };
+    const scenarios = [];
+    for (let mask = 0; mask < (1 << bits); mask++) {
+      const assign = {};
+      for (let i = 0; i < bits; i++) { const m = undecided[i]; const wf = (fn) => (ko[fn] && ko[fn].winner) || assign[fn]; const t = [wf(m.f1), wf(m.f2)]; assign[m.n] = ((mask >> i) & 1) ? t[1] : t[0]; }
+      const winnerOf = (n) => (ko[n] && ko[n].winner) || assign[n];
+      const ach = { qf: new Set(), sf: new Set(), final: new Set(), champ: new Set() };
+      for (const g of games) { const w = winnerOf(g.n); if (w) ach[feedsKey[g.r]].add(w); }
+      const tot = {};
+      for (const n of bracket) { const a = playerPicks[n].advanced || {}; let x = cur[n]; for (const k of openKeys) { const picks = k === "champ" ? ((a.champ || [])[0] ? [a.champ[0]] : []) : (a[k] || []); for (const t of picks) if (ach[k].has(t)) x += KO_PTS[k]; } tot[n] = x; }
+      scenarios.push({ champ: [...ach.champ][0] || null, tot, finalists: [...ach.final], sf: [...ach.sf].sort() });
+    }
+    return { bracket, cur, scenarios };
+  }
+
+  function renderScenarios(playerPicks, results, names, teams, stage) {
+    teams = teams && teams.length ? teams : ["France"];
+    stage = stage || DEFAULT_STAGE;
+    const { bracket, cur, scenarios } = computeOutcomes(playerPicks, results, names);
+    const total = scenarios.length;
+    if (!total) return null;
     const stat = {}; for (const n of bracket) stat[n] = { win: 0, best: null, bestScore: -1 };
-    for (let q = 0; q < 16; q++) {
-      const qw = {}; qf.forEach((m, i) => { qw[m.n] = ((q >> i) & 1) ? m.b : m.a; });
-      const sfSet = new Set(Object.values(qw));
-      for (let s = 0; s < 4; s++) {
-        const fw = {}; sf.forEach((m, j) => { const cand = [qw[m.f1], qw[m.f2]]; fw[m.n] = ((s >> j) & 1) ? cand[1] : cand[0]; });
-        const finSet = new Set(Object.values(fw));
-        const finalCand = [fw[fin.f1], fw[fin.f2]];
-        for (let fi = 0; fi < 2; fi++) {
-          const champ = fi ? finalCand[1] : finalCand[0];
-          const tot = {};
-          for (const n of bracket) { const a = playerPicks[n].advanced || {}; let x = cur[n]; for (const t of (a.sf || [])) if (sfSet.has(t)) x += 8; for (const t of (a.final || [])) if (finSet.has(t)) x += 13; if ((a.champ || [])[0] === champ) x += 21; tot[n] = x; }
-          const mx = Math.max(...bracket.map((n) => tot[n]));
-          const winners = bracket.filter((n) => tot[n] === mx);
-          if (winners.length === 1) { const n = winners[0]; stat[n].win++; if (tot[n] > stat[n].bestScore) { stat[n].bestScore = tot[n]; stat[n].best = { finSet: [...finSet], champ, score: tot[n] }; } }
-        }
-      }
+    for (const sc of scenarios) {
+      const mx = Math.max(...bracket.map((n) => sc.tot[n]));
+      const winners = bracket.filter((n) => sc.tot[n] === mx);
+      if (winners.length === 1) { const n = winners[0]; stat[n].win++; if (sc.tot[n] > stat[n].bestScore) { stat[n].bestScore = sc.tot[n]; stat[n].best = { finalists: sc.finalists, champ: sc.champ, score: sc.tot[n] }; } }
     }
     function teamCard(team) {
       const backers = bracket.filter((n) => (playerPicks[n].advanced?.champ || [])[0] === team);
@@ -2049,15 +2062,15 @@ function Analysis({ editions }) {
           <h2 style={h2Style}>THE {team.toUpperCase()} FAITHFUL</h2>
           <p style={{ fontSize: 12, color: C.mute, fontFamily: "'DM Mono', monospace", margin: "4px 0 14px" }}>Paths to the overall title for the {backers.length} who backed {team}</p>
           <p style={pStyle}>
-            {backers.length} {backers.length > 1 ? "players" : "player"} put the trophy on {team}, still alive in the quarterfinals. Across the 128 ways the rest of the bracket can fall, here's each one's road to winning the pool — every route runs through a {team} title.
+            {backers.length} {backers.length > 1 ? "players" : "player"} put the trophy on {team}, still alive in the {stage.wonLabel}. Across the {total} ways the rest of the bracket can fall, here's each one's road to winning the pool — every route runs through a {team} title.
           </p>
           {rows.map((r) => {
-            const other = r.best ? r.best.finSet.find((t) => t !== team) : null;
+            const other = r.best ? r.best.finalists.find((t) => t !== team) : null;
             return (
               <div key={r.n} style={{ padding: "9px 0", borderBottom: `1px solid ${C.line}` }}>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                   <span style={{ fontWeight: 700, fontSize: 14 }}>{r.n}</span>
-                  <span style={{ fontSize: 11, fontFamily: "'DM Mono', monospace", color: r.win > 0 ? C.pitch : C.mute }}>{r.win > 0 ? `${r.win} of 128 winning paths` : "no path left"}</span>
+                  <span style={{ fontSize: 11, fontFamily: "'DM Mono', monospace", color: r.win > 0 ? C.pitch : C.mute }}>{r.win > 0 ? `${r.win} of ${total} winning paths` : "no path left"}</span>
                 </div>
                 <div style={{ fontSize: 12.5, color: C.ink, lineHeight: 1.5, marginTop: 2 }}>
                   {r.win > 0
@@ -2621,7 +2634,7 @@ function Analysis({ editions }) {
                   return <React.Fragment key={ci}>{renderOddsEnds(playerPicks, snapResults, names, edition.customTidbits, edition.stage)}</React.Fragment>;
                 }
                 if (card === "scenarios") {
-                  return <React.Fragment key={ci}>{renderScenarios(playerPicks, snapResults, names, edition.scenarioTeams || (edition.scenarioTeam ? [edition.scenarioTeam] : ["France"]))}</React.Fragment>;
+                  return <React.Fragment key={ci}>{renderScenarios(playerPicks, snapResults, names, edition.scenarioTeams || (edition.scenarioTeam ? [edition.scenarioTeam] : ["France"]), edition.stage)}</React.Fragment>;
                 }
                 if (card === "chaos") {
                   return <React.Fragment key={ci}>{renderChaos(playerPicks, snapResults, names)}</React.Fragment>;
