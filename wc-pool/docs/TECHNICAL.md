@@ -203,7 +203,7 @@ Each edition freezes all player picks and match results at the time `analytics.m
 - `headline` — Large heading for the matchday report card (unique per edition)
 - `matchRange` — `[first, last]` match numbers for this edition's analysis
 - `previewRange` — `[first, last]` match numbers for the look-ahead preview card
-- `cards` — Array of card types to render: `"matchday"`, `"standings-movement"`, `"knockout-vision"`, `"consensus"`, `"preview"`, `"survivors"`, `"broken-brackets"`, `"collisions"`, `"question"`, `"title-race"`, `"odds-ends"`, `"scenarios"`, `"chaos"`
+- `cards` — Array of card types to render: `"matchday"`, `"standings-movement"`, `"knockout-vision"`, `"consensus"`, `"preview"`, `"survivors"`, `"broken-brackets"`, `"collisions"`, `"question"`, `"title-race"`, `"odds-ends"`, `"scenarios"`, `"chaos"`, `"scenario-table"`, `"leaderboard"`
 - `stage` — (knockout editions) descriptor driving the generic knockout cards: `wonKey`/`wonLabel` (round the survivors reached), `nextKey`/`nextLabel`/`nextTitle`/`nextShort`/`nextPlace` (round they play toward), `gamesTag`, `lockedLabel`. Omitted editions fall back to `DEFAULT_STAGE` (post-Round-of-32 semantics).
 - `scenarioTeams` — (scenarios card) array of champion teams to build "Road to Glory" cards for
 - `collisionNote` / `customTidbits` — optional editorial content for the collisions / odds-ends cards
@@ -411,15 +411,21 @@ Only the outcome matters (H/D/A), not the exact score.
 | `HBar` | data, maxVal, barColor, height, showPct, total | Horizontal bar chart |
 | `DotRow` | label, outcomes, playerNames, total | Dot matrix for match outcome distribution |
 
-The Analysis component uses internal render functions for each card type. Group/pre-knockout cards: `renderMatchdayReport`, `renderStandingsMovement`, `renderKnockoutVision`, `renderConsensusCard`, `renderPreviewCard`, `renderKnockoutPreview`. Knockout cards: `renderSurvivors`, `renderBrokenBrackets`, `renderCollisions`, `renderQuestion`, `renderTitleRace`, `renderOddsEnds`, `renderScenarios`, `renderChaos`. Each edition's `cards` array determines which render functions are called.
+The Analysis component uses internal render functions for each card type. Group/pre-knockout cards: `renderMatchdayReport`, `renderStandingsMovement`, `renderKnockoutVision`, `renderConsensusCard`, `renderPreviewCard`, `renderKnockoutPreview`. Knockout cards: `renderSurvivors`, `renderBrokenBrackets`, `renderCollisions`, `renderQuestion`, `renderTitleRace`, `renderOddsEnds`, `renderScenarios`, `renderChaos`, `renderScenarioTable`, `renderLeaderboard`. Each edition's `cards` array determines which render functions are called.
 
-**Stage-driven knockout cards.** The knockout cards are generic — driven by the edition's `stage` descriptor rather than hardcoded round keys — so the same code serves each knockout edition (post-R32 = "Round of 32 — The Cull", post-R16 = "Round of 16 — The Elite Eight", and future rounds). `stage.wonKey` is the round the survivors reached; `stage.nextKey` is the round they play toward. Editions without a `stage` fall back to `DEFAULT_STAGE` (post-R32 semantics), so the frozen R32 edition still renders identically. Card ids `"collisions"`/`"question"` are the generic forms; `"r16-collisions"`/`"qf-question"` remain as aliases for the frozen R32 edition.
+**Stage-driven knockout cards.** The knockout cards are generic — driven by the edition's `stage` descriptor rather than hardcoded round keys — so the same code serves each knockout edition (post-R32 = "Round of 32 — The Cull", post-R16 = "Round of 16 — The Elite Eight", post-QF = "Quarterfinals — The Final Four", and future rounds). `stage.wonKey` is the round the survivors reached; `stage.nextKey` is the round they play toward. Editions without a `stage` fall back to `DEFAULT_STAGE` (post-R32 semantics), so the frozen R32 edition still renders identically. Card ids `"collisions"`/`"question"` are the generic forms; `"r16-collisions"`/`"qf-question"` remain as aliases for the frozen R32 edition.
 
-These cards share a helper, `computeKO(playerPicks, results, names, stage)`, which resolves the actual R32 field (`computeQualifiers`), the survivor set (`results.advanced[stage.wonKey]`), the upcoming matchups (`KNOCKOUT` round `stage.wonKey` + `results.koScores` winners), the bracket-filling players, `countIn`/`whoIn` popularity helpers, and `elimWhere(team)` (where a team was eliminated).
+These cards share a helper, `computeKO(playerPicks, results, names, stage)`, which resolves the actual R32 field (`computeQualifiers`), the survivor set (`results.advanced[stage.wonKey]`), the upcoming matchups (`KNOCKOUT` round `stage.wonKey` + `results.koScores` winners), the bracket-filling players, `countIn`/`whoIn` popularity helpers, and `elimWhere(team)` (where a team was eliminated). Optional stage fields tune the prose without touching frozen editions: `note` (extra line in Survivors), `newBreaksRound` + `brokenNote` (Broken Brackets focuses on just that round's fresh damage), and `raceLead`/`raceTail` (Title Race).
 
-**`renderScenarios`** enumerates every remaining bracket outcome (4 QF × 2 SF × 1 Final = **128 scenarios**) from the snapshot. For each champion team in the edition's `scenarioTeams`, it renders a "Road to Glory" card listing that team's backers with the count of the 128 outcomes that make them the sole pool winner, plus each one's best-case path. Fully deterministic from the frozen snapshot.
+**Stage-aware scenario enumeration.** A second helper, `computeOutcomes(playerPicks, results, names)`, enumerates every outcome of the *undecided* knockout games from the current frontier forward — 128 post-R16 (QF+SF+Final), 8 post-QF (SF+Final) — and scores each player, adding points only for rounds not already locked (so nothing double-counts). It returns each scenario's champion, finalists, and per-player totals.
 
-**`renderChaos`** runs the same 128-outcome enumeration but focuses on the **dark horses** — the surviving teams that were *no* player's champion pick (auto-derived). For each, it shows who wins the pool if that team lifts the trophy, with each beneficiary's win count, best-case score, and the full "last four" (so scenarios sharing a final are distinguished), plus an overall "chaos king". Of the 128 outcomes, exactly half (64 = 16 per dark horse) have a dark-horse champion.
+**`renderScenarios`** ("Road to Glory") uses `computeOutcomes`; for each champion team in `scenarioTeams` it lists that team's backers with how many of the (dynamic) total outcomes make them the sole pool winner, plus each one's best-case path.
+
+**`renderChaos`** ("The Chaos Bracket") focuses on the **dark horses** — surviving teams that were *no* player's champion pick (auto-derived); shows who wins the pool if each lifts the trophy, with each beneficiary's win count, best-case score, and the full "last four", plus an overall "chaos king". (No dark horses reached the semifinals, so the QF edition omits this card.)
+
+**`renderScenarioTable`** ("The Eight Endings") lists every remaining outcome as *field result → pool standings* (final matchup + champion, the semifinals that produce it, and the resulting pool winner with the top three). Guarded to render only when ≤ 8 outcomes remain, so it stays off the 128-path R16 edition.
+
+**`renderLeaderboard`** ("The Standings") shows each contender's current points, rank movement since the previous round's totals (up/down arrows), and a "Paths" column = how many of the remaining outcomes crown them (from `computeOutcomes`). Optional `leaderboardNote` carries editorial prose.
 
 - `survivors` — R16 field vs pool R16 picks: chalk, the zero-bracket "gatecrasher" callout, and the sharp few (with names).
 - `broken-brackets` — champion/finalist/semifinalist picks already eliminated (distinguishing "out in the groups" vs "lost in the R32"), plus still-perfect Final Fours.
@@ -427,8 +433,10 @@ These cards share a helper, `computeKO(playerPicks, results, names, stage)`, whi
 - `qf-question` — consensus vs contrarian quarterfinal picks among survivors, plus a "Riding the Longshots" roll-call naming who backs each lightly-owned survivor (≤ half the pool) into the QF.
 - `title-race` — current locked score (`scorePlayer`) plus each player's remaining ceiling (points × still-alive picks over the rounds after `stage.wonKey`); kindly flags anyone whose max can't reach the leader's current score.
 - `odds-ends` — computed tidbits (maverick, people's champion) plus editorial `customTidbits` (array of `{h, p}`).
-- `scenarios` — the 128-outcome "Road to Glory" analysis, one card per team in `scenarioTeams`.
+- `scenarios` — the "Road to Glory" analysis, one card per team in `scenarioTeams`.
 - `chaos` — the "Chaos Bracket": pool outcomes if a dark horse (no player's champion) wins it all.
+- `scenario-table` — "The Eight Endings": every remaining outcome as field result → pool standings (≤ 8 outcomes only).
+- `leaderboard` — "The Standings": points, movement since the prior round, and a Paths-to-win column.
 
 Other flags:
 - `includeR32` (on `standings-movement`): rank by **total points** (group ×1 + Round-of-32 ×2) instead of raw group-outcome counts, so it matches the Standings tab once the R32 field is known.
@@ -517,6 +525,7 @@ node analytics.mjs round2    # Save/update Round 2 edition (matches 25–48)
 node analytics.mjs round3    # Save/update Round 3 edition (matches 49–72, group stage complete)
 node analytics.mjs r32       # Save/update the post–Round-of-32 edition ("The Cull")
 node analytics.mjs r16       # Save/update the post–Round-of-16 edition ("The Elite Eight")
+node analytics.mjs qf        # Save/update the post–Quarterfinal edition ("The Final Four")
 node analytics.mjs            # Defaults to round1
 ```
 

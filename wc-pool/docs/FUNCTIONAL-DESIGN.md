@@ -192,6 +192,15 @@ In place of Odds & Ends it closes with **scenario analysis**:
 - **Road to Glory** — a set of cards, one for each still-standing champion pick (France, Spain, England, Argentina). Each enumerates all 128 remaining ways the bracket can play out and, for every player who backed that team, shows **how many of those outcomes would make them the overall pool winner** and their best-case path. Players who can no longer win are noted kindly (still cheering their team on for pride).
 - **The Chaos Bracket** — the flip side: what happens to the pool if one of the four dark horses nobody crowned (Morocco, Belgium, Norway, Switzerland) lifts the trophy. Since no player claims the champion points, it shows who'd win the pool in each case, each beneficiary's best-case score and required "last four," and names the overall "chaos king" (the player who benefits most from a burning bracket).
 
+#### Edition 6: "Quarterfinals — The Final Four"
+
+The third knockout edition, published once the quarterfinals are done and the semifinal matchups are set. Deliberately leaner (only a handful of outcomes remain), with four cards:
+
+- **The Survivors** — confirms the last four are the pool's favorites *and* the top four teams in the FIFA World Rankings; chalk all the way.
+- **Broken Brackets** — focuses only on the *fresh* damage from the quarterfinals; notes that "chaos never came" (all four dark horses lost).
+- **The Eight Endings** — the heart of the edition: every one of the remaining outcomes spelled out as *what happens on the field → who wins the pool* (the final matchup and champion, the semifinals that produce it, and the resulting pool winner with the top three).
+- **The Standings** — each contender's points, how their rank has moved since the Round-of-16 totals (up/down arrows), and a "Paths to win" column (how many of the remaining outcomes crown them). Includes a note explaining how a leader can hold the top spot yet have very few winning paths, when the bracket pits two of their finalists against each other early.
+
 Analysis by Claude is credited on the page.
 
 ### Tab 7: Updates
