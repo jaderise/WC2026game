@@ -438,7 +438,7 @@ export default function App() {
         const ids = await sList(NS + "player:"); const rows = [];
         for (const key of ids) { const data = await sGet(key); if (!data) continue;
           const sc = scorePlayer(data.picks || emptyPicks(), res || emptyResults());
-          rows.push({ id: key, name: data.name || key, total: sc.total, breakdown: sc.breakdown, locked: !!data.locked }); }
+          rows.push({ id: key, name: data.name || key, total: sc.total, breakdown: sc.breakdown, locked: !!data.locked, picks: data.picks || emptyPicks() }); }
         rows.sort((a, b) => b.total - a.total); setStandRows(rows);
       }
     }
@@ -616,7 +616,7 @@ export default function App() {
     const ids = await sList(NS + "player:"); const rows = [];
     for (const key of ids) { const data = await sGet(key); if (!data) continue;
       const sc = scorePlayer(data.picks || emptyPicks(), results);
-      rows.push({ id: key, name: data.name || key, total: sc.total, breakdown: sc.breakdown, locked: !!data.locked }); }
+      rows.push({ id: key, name: data.name || key, total: sc.total, breakdown: sc.breakdown, locked: !!data.locked, picks: data.picks || emptyPicks() }); }
     rows.sort((a, b) => b.total - a.total); setStandRows(rows);
   })(); }, [tab, results]);
 
@@ -631,7 +631,7 @@ export default function App() {
         : <PlayTab playerName={playerName} picks={picks} editable={editable} locked={locked} pastDeadline={pastDeadline} setScorePick={setScorePick} toggleAdvance={toggleAdvance} onSave={() => savePicks({ lock: false })} onLock={() => savePicks({ lock: true })} onUnlock={unlockPicks} onSwitch={() => { setPlayerId(null); setNameInput(""); }} />)}
       {tab === "tables" && <Tables qual={qual} />}
       {tab === "bracket" && <Bracket advanced={results.advanced} koScores={results.koScores} />}
-      {tab === "standings" && <Standings rows={standRows} autoReady={qual.allComplete} />}
+      {tab === "standings" && <Standings rows={standRows} autoReady={qual.allComplete} results={results} />}
       {tab === "league" && <LeaguePicks entries={leagueEntries} revealed={results.revealed} />}
       {tab === "analysis" && <Analysis editions={analysisPosts} />}
       {tab === "updates" && <Updates announcements={results.announcements || []} onPost={postAnnouncement} onDelete={deleteAnnouncement} isCommissioner={!!playerId} />}
@@ -1086,12 +1086,123 @@ function Bracket({ advanced, koScores }) {
   );
 }
 
-function Standings({ rows, autoReady }) {
+const CHART_MONTHS = { Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6, Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12 };
+function chartDateVal(s) { const m = String(s).match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d+)/); return m ? CHART_MONTHS[m[1]] * 100 + (+m[2]) : 0; }
+function chartDateLabel(s) { const m = String(s).match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d+)/); return m ? `${m[1]} ${m[2]}` : String(s); }
+
+// Interactive points-over-time chart. Computes each contender's cumulative total by
+// tournament day from data the Standings tab already has (no extra fetch), memoized so
+// hover/tap only restyle. Top 3 (by current total) get colors, the rest are grey; hover
+// reveals a name, tap locks a 4th highlight.
+function PointsChart({ rows, results }) {
+  const [hovered, setHovered] = useState(null);
+  const [selected, setSelected] = useState(null);
+  const data = useMemo(() => {
+    const players = rows.filter((r) => (r.picks?.advanced?.champ || []).length || (r.picks?.advanced?.sf || []).length);
+    if (players.length < 2) return null;
+    const scores = results.scores || {};
+    const ko = results.koScores || {};
+    const groupMatches = MATCHES.filter((mm) => scores[mm.m] && scores[mm.m].hg != null);
+    if (!groupMatches.length) return null;
+    const allGroupsDone = MATCHES.every((mm) => scores[mm.m] && scores[mm.m].hg != null);
+    const lastGroupVal = Math.max(0, ...MATCHES.map((mm) => chartDateVal(mm.d)));
+    const actualR32 = allGroupsDone ? new Set(computeQualifiers(scores, results.manualOrder || {}, results.manualThird || []).r32) : new Set();
+    const koGames = KNOCKOUT.filter((g) => KO_NEXT[g.r] && ko[g.n] && ko[g.n].winner).map((g) => ({ n: g.n, val: chartDateVal(g.et), K: KO_NEXT[g.r], w: ko[g.n].winner }));
+    const dateSet = new Map();
+    for (const mm of groupMatches) dateSet.set(chartDateVal(mm.d), chartDateLabel(mm.d));
+    for (const g of koGames) dateSet.set(g.val, chartDateLabel(KO_BY_NUM[g.n].et));
+    const dates = [...dateSet.keys()].sort((a, b) => a - b).map((v) => ({ val: v, label: dateSet.get(v) }));
+    if (dates.length < 2) return null;
+    const KPTS = { r16: 3, qf: 5, sf: 8, final: 13, champ: 21 };
+    const series = players.map((p) => {
+      const pk = p.picks || {};
+      const pr32 = new Set(playerR32(pk).r32);
+      let r32c = 0; for (const tt of pr32) if (actualR32.has(tt)) r32c++;
+      const pts = dates.map((d) => {
+        let t = 0;
+        for (const mm of groupMatches) if (chartDateVal(mm.d) <= d.val && predOutcome(pk.scores?.[mm.m]) === predOutcome(scores[mm.m])) t += 1;
+        if (allGroupsDone && d.val >= lastGroupVal) t += 2 * r32c;
+        for (const g of koGames) if (g.val <= d.val && (pk.advanced?.[g.K] || []).includes(g.w)) t += KPTS[g.K];
+        return t;
+      });
+      return { name: p.name, pts, final: pts[pts.length - 1] };
+    });
+    const maxT = Math.max(1, ...series.map((s) => s.final));
+    const topNames = [...series].sort((a, b) => b.final - a.final).slice(0, 3).map((s) => s.name);
+    return { dates, series, maxT, topNames };
+  }, [rows, results]);
+  if (!data) return null;
+
+  const RC = ["#2563EB", "#E8B23A", "#1F7A4D"]; const SEL = "#7C3AED"; const GREY = "#C7C1B2";
+  const colorOf = (name) => { if (selected === name) return SEL; const i = data.topNames.indexOf(name); return i >= 0 ? RC[i] : (hovered === name ? C.mute : GREY); };
+  const isHi = (name) => selected === name || data.topNames.includes(name);
+  const W = 340, H = 210, padL = 26, padR = 46, padT = 10, padB = 20;
+  const n = data.dates.length;
+  const xf = (i) => padL + (i / (n - 1)) * (W - padL - padR);
+  const yf = (v) => (H - padB) - (v / data.maxT) * (H - padB - padT);
+  const pointsStr = (s) => s.pts.map((v, i) => `${xf(i).toFixed(1)},${yf(v).toFixed(1)}`).join(" ");
+  const grey = data.series.filter((s) => !isHi(s.name));
+  const hi = data.series.filter((s) => isHi(s.name));
+  const labelNames = [...new Set([...data.topNames, selected, hovered].filter(Boolean))];
+  const yTicks = [0, Math.round(data.maxT / 2), data.maxT];
+  const xIdx = []; const step = Math.max(1, Math.ceil((n - 1) / 5)); for (let i = 0; i < n; i += step) xIdx.push(i); if (xIdx[xIdx.length - 1] !== n - 1) xIdx.push(n - 1);
+  const legendNames = [...data.topNames, ...(selected && !data.topNames.includes(selected) ? [selected] : [])];
+
+  return (
+    <div style={{ margin: "6px 0 20px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+        <div style={{ fontFamily: "Anton, sans-serif", fontSize: 18 }}>POINTS OVER TIME</div>
+        <div style={{ fontSize: 10.5, color: C.mute }}>tap a line to highlight</div>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
+        {yTicks.map((v, i) => (
+          <g key={i}>
+            <line x1={padL} y1={yf(v)} x2={W - padR} y2={yf(v)} stroke={C.line} strokeWidth="0.5" />
+            <text x={padL - 3} y={yf(v) + 3} textAnchor="end" fontSize="7" fill={C.mute} fontFamily="'DM Mono', monospace">{v}</text>
+          </g>
+        ))}
+        {xIdx.map((i) => (
+          <text key={i} x={xf(i)} y={H - padB + 10} textAnchor="middle" fontSize="7" fill={C.mute} fontFamily="'DM Mono', monospace">{data.dates[i].label}</text>
+        ))}
+        {grey.map((s) => (
+          <polyline key={s.name} points={pointsStr(s)} fill="none" stroke={hovered === s.name ? C.mute : GREY} strokeWidth={hovered === s.name ? 2.2 : 1} strokeOpacity={hovered === s.name ? 1 : 0.4} strokeLinejoin="round" strokeLinecap="round" />
+        ))}
+        {hi.map((s) => (
+          <polyline key={s.name} points={pointsStr(s)} fill="none" stroke={colorOf(s.name)} strokeWidth={2.8} strokeLinejoin="round" strokeLinecap="round" />
+        ))}
+        {data.series.map((s) => (
+          <polyline key={s.name} points={pointsStr(s)} fill="none" stroke="transparent" strokeWidth="12" style={{ cursor: "pointer" }}
+            onMouseEnter={() => setHovered(s.name)} onMouseLeave={() => setHovered(null)}
+            onClick={() => setSelected((cur) => cur === s.name ? null : s.name)} />
+        ))}
+        {(() => {
+          const lbls = labelNames.map((name) => { const s = data.series.find((x) => x.name === name); return s ? { name, y: yf(s.pts[s.pts.length - 1]) } : null; }).filter(Boolean).sort((a, b) => a.y - b.y);
+          for (let i = 1; i < lbls.length; i++) if (lbls[i].y - lbls[i - 1].y < 8) lbls[i].y = lbls[i - 1].y + 8;
+          return lbls.map((l) => (
+            <text key={l.name} x={xf(n - 1) + 3} y={l.y + 2.5} fontSize="7.5" fontWeight="700" fill={colorOf(l.name)} fontFamily="'DM Sans'">{l.name}</text>
+          ));
+        })()}
+      </svg>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 6 }}>
+        {legendNames.map((name) => (
+          <div key={name} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12 }}>
+            <span style={{ width: 14, height: 3, borderRadius: 2, background: colorOf(name) }} />
+            <span style={{ fontWeight: 600 }}>{name}</span>
+          </div>
+        ))}
+        {selected && <button onClick={() => setSelected(null)} style={{ background: "transparent", border: "none", color: C.mute, fontSize: 11, cursor: "pointer", fontFamily: "inherit", textDecoration: "underline" }}>clear</button>}
+      </div>
+    </div>
+  );
+}
+
+function Standings({ rows, autoReady, results }) {
   if (!rows.length) return <div style={{ padding: "30px 18px", color: C.mute }}>No entries yet. Standings appear once players make picks and scores are entered.</div>;
   const max = rows[0]?.total || 1;
   return (
     <div style={{ padding: "18px 14px" }}>
       <Eyebrow>Live standings</Eyebrow>
+      {results && <PointsChart rows={rows} results={results} />}
       {!autoReady && <div style={{ fontSize: 11.5, color: C.mute, margin: "8px 0", lineHeight: 1.5 }}>Round-of-32 points activate automatically once every group game has a score entered.</div>}
       <div style={{ marginTop: 12 }}>
         {rows.map((r, i) => (
