@@ -1094,8 +1094,8 @@ function chartDateLabel(s) { const m = String(s).match(/(Jan|Feb|Mar|Apr|May|Jun
 // tournament day from data the Standings tab already has (no extra fetch), memoized so
 // hover/tap only restyle. We skip the absolute-points series (all lines bunch near the top
 // once the knockouts start) and instead show the two views that separate the pack: RANK
-// over time (a bump chart) and GAP to the current leader. Top 3 (by current total) get
-// colors, the rest are grey; hover reveals a name, tap locks a 4th highlight. Highlight
+// over time (a bump chart) and GAP to the current leader. Top 4 (by current total) get
+// colors, the rest are grey; hover reveals a name, tap locks a 5th highlight. Highlight
 // state is shared, so touching a line lights it up in both charts.
 function PointsChart({ rows, results }) {
   const [hovered, setHovered] = useState(null);
@@ -1141,12 +1141,12 @@ function PointsChart({ rows, results }) {
       s.rank = dates.map((_, i) => rankAt[i][s.name]);
     });
     const maxGap = Math.max(1, ...series.flatMap((s) => s.gap));
-    const topNames = [...series].sort((a, b) => b.final - a.final).slice(0, 3).map((s) => s.name);
+    const topNames = [...series].sort((a, b) => b.final - a.final).slice(0, 4).map((s) => s.name);
     return { dates, series, topNames, N: series.length, maxGap };
   }, [rows, results]);
   if (!data) return null;
 
-  const RC = ["#2563EB", "#E8B23A", "#1F7A4D"]; const SEL = "#7C3AED"; const GREY = "#C7C1B2";
+  const RC = ["#2563EB", "#E8B23A", "#1F7A4D", "#D64545"]; const SEL = "#7C3AED"; const GREY = "#C7C1B2";
   const colorOf = (name) => { if (selected === name) return SEL; const i = data.topNames.indexOf(name); return i >= 0 ? RC[i] : (hovered === name ? C.mute : GREY); };
   const isHi = (name) => selected === name || data.topNames.includes(name);
   const W = 340, H = 190, padL = 30, padR = 48, padT = 12, padB = 20;
