@@ -1146,7 +1146,11 @@ function PointsChart({ rows, results }) {
   }, [rows, results]);
   if (!data) return null;
 
-  const RC = ["#2563EB", "#E8B23A", "#1F7A4D", "#D64545", "#7C3AED"]; const SEL = "#DB2777"; const GREY = "#C7C1B2";
+  // Colorblind-safe categorical order (validated via the dataviz palette checker against
+  // the cream surface, all-pairs): blue / orange / green / magenta / purple — no red-green
+  // pair, blue and purple well separated. Direct labels + legend provide the secondary
+  // encoding, so identity never rests on color alone. Tap-highlight is near-black.
+  const RC = ["#0072B2", "#C64B00", "#009E73", "#CC79A7", "#5D3A9B"]; const SEL = "#111111"; const GREY = "#C7C1B2";
   const colorOf = (name) => { if (selected === name) return SEL; const i = data.topNames.indexOf(name); return i >= 0 ? RC[i] : (hovered === name ? C.mute : GREY); };
   const isHi = (name) => selected === name || data.topNames.includes(name);
   const W = 340, H = 190, padL = 30, padR = 48, padT = 12, padB = 20;
