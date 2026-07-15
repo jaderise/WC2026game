@@ -1090,10 +1090,13 @@ const CHART_MONTHS = { Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6, Jul: 7, A
 function chartDateVal(s) { const m = String(s).match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d+)/); return m ? CHART_MONTHS[m[1]] * 100 + (+m[2]) : 0; }
 function chartDateLabel(s) { const m = String(s).match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d+)/); return m ? `${m[1]} ${m[2]}` : String(s); }
 
-// Interactive points-over-time chart. Computes each contender's cumulative total by
+// Interactive competition-shape charts. Reconstructs each contender's cumulative total by
 // tournament day from data the Standings tab already has (no extra fetch), memoized so
-// hover/tap only restyle. Top 3 (by current total) get colors, the rest are grey; hover
-// reveals a name, tap locks a 4th highlight.
+// hover/tap only restyle. We skip the absolute-points series (all lines bunch near the top
+// once the knockouts start) and instead show the two views that separate the pack: RANK
+// over time (a bump chart) and GAP to the current leader. Top 3 (by current total) get
+// colors, the rest are grey; hover reveals a name, tap locks a 4th highlight. Highlight
+// state is shared, so touching a line lights it up in both charts.
 function PointsChart({ rows, results }) {
   const [hovered, setHovered] = useState(null);
   const [selected, setSelected] = useState(null);
@@ -1127,63 +1130,87 @@ function PointsChart({ rows, results }) {
       });
       return { name: p.name, pts, final: pts[pts.length - 1] };
     });
-    const maxT = Math.max(1, ...series.map((s) => s.final));
+    // Per-day leader total and per-day rank (1 = best), then attach gap/rank tracks.
+    const leaderAt = dates.map((_, i) => Math.max(...series.map((s) => s.pts[i])));
+    const rankAt = dates.map((_, i) => {
+      const ord = [...series].sort((a, b) => b.pts[i] - a.pts[i]); const m = {};
+      ord.forEach((s, r) => { m[s.name] = r + 1; }); return m;
+    });
+    series.forEach((s) => {
+      s.gap = s.pts.map((p, i) => leaderAt[i] - p);
+      s.rank = dates.map((_, i) => rankAt[i][s.name]);
+    });
+    const maxGap = Math.max(1, ...series.flatMap((s) => s.gap));
     const topNames = [...series].sort((a, b) => b.final - a.final).slice(0, 3).map((s) => s.name);
-    return { dates, series, maxT, topNames };
+    return { dates, series, topNames, N: series.length, maxGap };
   }, [rows, results]);
   if (!data) return null;
 
   const RC = ["#2563EB", "#E8B23A", "#1F7A4D"]; const SEL = "#7C3AED"; const GREY = "#C7C1B2";
   const colorOf = (name) => { if (selected === name) return SEL; const i = data.topNames.indexOf(name); return i >= 0 ? RC[i] : (hovered === name ? C.mute : GREY); };
   const isHi = (name) => selected === name || data.topNames.includes(name);
-  const W = 340, H = 210, padL = 26, padR = 46, padT = 10, padB = 20;
+  const W = 340, H = 190, padL = 30, padR = 48, padT = 12, padB = 20;
+  const plotH = H - padB - padT;
   const n = data.dates.length;
   const xf = (i) => padL + (i / (n - 1)) * (W - padL - padR);
-  const yf = (v) => (H - padB) - (v / data.maxT) * (H - padB - padT);
-  const pointsStr = (s) => s.pts.map((v, i) => `${xf(i).toFixed(1)},${yf(v).toFixed(1)}`).join(" ");
-  const grey = data.series.filter((s) => !isHi(s.name));
-  const hi = data.series.filter((s) => isHi(s.name));
-  const labelNames = [...new Set([...data.topNames, selected, hovered].filter(Boolean))];
-  const yTicks = [0, Math.round(data.maxT / 2), data.maxT];
   const xIdx = []; const step = Math.max(1, Math.ceil((n - 1) / 5)); for (let i = 0; i < n; i += step) xIdx.push(i); if (xIdx[xIdx.length - 1] !== n - 1) xIdx.push(n - 1);
   const legendNames = [...data.topNames, ...(selected && !data.topNames.includes(selected) ? [selected] : [])];
+  const labelNames = [...new Set([...data.topNames, selected, hovered].filter(Boolean))];
+
+  // One SVG per view. `valueAt(series, i)` returns the plotted quantity; `yf(v)` maps it to
+  // a pixel row (top row = best in both charts); `ticks` are the y-axis gridlines.
+  const renderChart = (title, subtitle, valueAt, yf, ticks) => {
+    const pointsStr = (s) => s.pts.map((_, i) => `${xf(i).toFixed(1)},${yf(valueAt(s, i)).toFixed(1)}`).join(" ");
+    const grey = data.series.filter((s) => !isHi(s.name));
+    const hi = data.series.filter((s) => isHi(s.name));
+    const lbls = labelNames.map((name) => { const s = data.series.find((x) => x.name === name); return s ? { name, y: yf(valueAt(s, n - 1)) } : null; }).filter(Boolean).sort((a, b) => a.y - b.y);
+    for (let i = 1; i < lbls.length; i++) if (lbls[i].y - lbls[i - 1].y < 8) lbls[i].y = lbls[i - 1].y + 8;
+    return (
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 2 }}>
+          <div style={{ fontFamily: "Anton, sans-serif", fontSize: 17 }}>{title}</div>
+          <div style={{ fontSize: 10, color: C.mute }}>{subtitle}</div>
+        </div>
+        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
+          {ticks.map((t, i) => (
+            <g key={i}>
+              <line x1={padL} y1={yf(t.v)} x2={W - padR} y2={yf(t.v)} stroke={C.line} strokeWidth="0.5" />
+              <text x={padL - 3} y={yf(t.v) + 3} textAnchor="end" fontSize="7" fill={C.mute} fontFamily="'DM Mono', monospace">{t.l}</text>
+            </g>
+          ))}
+          {xIdx.map((i) => (
+            <text key={i} x={xf(i)} y={H - padB + 10} textAnchor="middle" fontSize="7" fill={C.mute} fontFamily="'DM Mono', monospace">{data.dates[i].label}</text>
+          ))}
+          {grey.map((s) => (
+            <polyline key={s.name} points={pointsStr(s)} fill="none" stroke={hovered === s.name ? C.mute : GREY} strokeWidth={hovered === s.name ? 2.2 : 1} strokeOpacity={hovered === s.name ? 1 : 0.4} strokeLinejoin="round" strokeLinecap="round" />
+          ))}
+          {hi.map((s) => (
+            <polyline key={s.name} points={pointsStr(s)} fill="none" stroke={colorOf(s.name)} strokeWidth={2.8} strokeLinejoin="round" strokeLinecap="round" />
+          ))}
+          {data.series.map((s) => (
+            <polyline key={s.name} points={pointsStr(s)} fill="none" stroke="transparent" strokeWidth="12" style={{ cursor: "pointer" }}
+              onMouseEnter={() => setHovered(s.name)} onMouseLeave={() => setHovered(null)}
+              onClick={() => setSelected((cur) => cur === s.name ? null : s.name)} />
+          ))}
+          {lbls.map((l) => (
+            <text key={l.name} x={xf(n - 1) + 3} y={l.y + 2.5} fontSize="7.5" fontWeight="700" fill={colorOf(l.name)} fontFamily="'DM Sans'">{l.name}</text>
+          ))}
+        </svg>
+      </div>
+    );
+  };
+
+  const rankTicks = [{ v: 1, l: "#1" }, { v: Math.ceil(data.N / 2), l: "#" + Math.ceil(data.N / 2) }, { v: data.N, l: "#" + data.N }];
+  const rankYf = (r) => padT + ((r - 1) / Math.max(1, data.N - 1)) * plotH;
+  const gapTicks = [{ v: 0, l: "0" }, { v: Math.round(data.maxGap / 2), l: "−" + Math.round(data.maxGap / 2) }, { v: data.maxGap, l: "−" + data.maxGap }];
+  const gapYf = (g) => padT + (g / data.maxGap) * plotH;
 
   return (
     <div style={{ margin: "6px 0 20px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
-        <div style={{ fontFamily: "Anton, sans-serif", fontSize: 18 }}>POINTS OVER TIME</div>
-        <div style={{ fontSize: 10.5, color: C.mute }}>tap a line to highlight</div>
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
-        {yTicks.map((v, i) => (
-          <g key={i}>
-            <line x1={padL} y1={yf(v)} x2={W - padR} y2={yf(v)} stroke={C.line} strokeWidth="0.5" />
-            <text x={padL - 3} y={yf(v) + 3} textAnchor="end" fontSize="7" fill={C.mute} fontFamily="'DM Mono', monospace">{v}</text>
-          </g>
-        ))}
-        {xIdx.map((i) => (
-          <text key={i} x={xf(i)} y={H - padB + 10} textAnchor="middle" fontSize="7" fill={C.mute} fontFamily="'DM Mono', monospace">{data.dates[i].label}</text>
-        ))}
-        {grey.map((s) => (
-          <polyline key={s.name} points={pointsStr(s)} fill="none" stroke={hovered === s.name ? C.mute : GREY} strokeWidth={hovered === s.name ? 2.2 : 1} strokeOpacity={hovered === s.name ? 1 : 0.4} strokeLinejoin="round" strokeLinecap="round" />
-        ))}
-        {hi.map((s) => (
-          <polyline key={s.name} points={pointsStr(s)} fill="none" stroke={colorOf(s.name)} strokeWidth={2.8} strokeLinejoin="round" strokeLinecap="round" />
-        ))}
-        {data.series.map((s) => (
-          <polyline key={s.name} points={pointsStr(s)} fill="none" stroke="transparent" strokeWidth="12" style={{ cursor: "pointer" }}
-            onMouseEnter={() => setHovered(s.name)} onMouseLeave={() => setHovered(null)}
-            onClick={() => setSelected((cur) => cur === s.name ? null : s.name)} />
-        ))}
-        {(() => {
-          const lbls = labelNames.map((name) => { const s = data.series.find((x) => x.name === name); return s ? { name, y: yf(s.pts[s.pts.length - 1]) } : null; }).filter(Boolean).sort((a, b) => a.y - b.y);
-          for (let i = 1; i < lbls.length; i++) if (lbls[i].y - lbls[i - 1].y < 8) lbls[i].y = lbls[i - 1].y + 8;
-          return lbls.map((l) => (
-            <text key={l.name} x={xf(n - 1) + 3} y={l.y + 2.5} fontSize="7.5" fontWeight="700" fill={colorOf(l.name)} fontFamily="'DM Sans'">{l.name}</text>
-          ));
-        })()}
-      </svg>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 6 }}>
+      <div style={{ fontSize: 10.5, color: C.mute, marginBottom: 6, textAlign: "right" }}>tap a line to highlight it</div>
+      {renderChart("RANK OVER TIME", "daily standing · #1 = leader", (s, i) => s.rank[i], rankYf, rankTicks)}
+      {renderChart("GAP TO LEADER", "points behind the leader", (s, i) => s.gap[i], gapYf, gapTicks)}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 2 }}>
         {legendNames.map((name) => (
           <div key={name} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12 }}>
             <span style={{ width: 14, height: 3, borderRadius: 2, background: colorOf(name) }} />
