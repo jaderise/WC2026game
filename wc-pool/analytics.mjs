@@ -14,6 +14,9 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 const NS = "wc26:";
+// Read always comes from prod (wc26:) so snapshots use real picks/results. The WRITE target
+// can be redirected to the sandbox namespace for dev review by setting PUBLISH_SANDBOX=1.
+const WRITE_NS = process.env.PUBLISH_SANDBOX === "1" ? "wc26test:" : NS;
 
 const GROUPS = {
   A: ["Mexico", "South Africa", "South Korea", "Czechia"],
@@ -417,7 +420,7 @@ async function main() {
     const name = players[id];
     snapPicks[name] = playerData[id].picks || { scores: {}, advanced: {} };
   }
-  const K_ANALYSIS = NS + "analysis";
+  const K_ANALYSIS = WRITE_NS + "analysis";
   const aDocId = K_ANALYSIS.replaceAll(":", "__");
 
   // Load existing editions
@@ -469,6 +472,64 @@ async function main() {
       cards: ["survivors", "broken-brackets", "scenario-table", "leaderboard"],
       leaderboardNote: "A word on Brent: he's led wire-to-wire and even nailed all four semifinalists — yet he holds just one path to the title. The culprit is the draw. Brent had France and Spain meeting in the final, with France lifting the trophy — but the bracket sends the two of them at each other in the semifinals. Only one can reach the final, so his dream two-favourite final simply can't happen. In any ending where France do go all the way, rivals who paired France with the actual other finalist (England or Argentina) leap above him. His single winning path is the awkward one — Argentina beating Spain in the final: he banks Spain as a finalist, and because France never lift the trophy, the France crowd can't overtake him.",
       snapshot: koSnapshot,
+    };
+  } else if (editionArg === "final") {
+    // Closing edition — the whole tournament is settled. Freeze the full snapshot (all group
+    // scores + every knockout field + koScores) so the final table scores exactly like the
+    // live standings, and carry the written wrap-up sections.
+    const finalSnapshot = {
+      playerPicks: snapPicks,
+      results: {
+        scores: results.scores || {},
+        advanced: results.advanced || {},
+        koScores: results.koScores || {},
+      },
+    };
+    newEdition = {
+      id: "final",
+      title: "The Final — Champions",
+      headline: "CHAMPIONS",
+      publishedAt: new Date().toISOString(),
+      champion: "Spain",
+      finalLine: "Spain 1–0 Argentina (a.e.t.) · England beat France 6–4 for third place",
+      cards: ["final-recap"],
+      sections: [
+        {
+          tags: ["THE TOURNAMENT", "HOW IT PLAYED OUT"],
+          title: "CHALK CRACKED, THEN HELD",
+          body: [
+            "The favourites started falling almost immediately. Germany, group winners, were bundled out in the Round of 32 on penalties by Paraguay. The Netherlands went the same way in the same round, beaten on spot-kicks by Morocco. Then the biggest name of all: Brazil, who had topped Group C, were knocked out in the Round of 16 by Norway. The bracket everyone had drawn in pen was suddenly full of holes.",
+            "For a while it looked like the tournament of the underdog. Morocco and Norway both charged into the quarterfinals, and Switzerland joined them there. But that is where the fairy tales ended — the last eight thinned back down to the heavyweights, and the final four came down to France, Spain, England and Argentina.",
+            "France were the story that curdled. Perfect in the group stage, the pool's runaway favourite, they ran straight into Spain in the semifinal and lost 2–0 — then lost a wild third-place game to England, 6–4, to finish a bitter fourth. Spain, quieter all month, kept winning the games that mattered: past Belgium, past France, and finally past Argentina, 1–0 after extra time in the final. **Spain are world champions.**",
+          ],
+        },
+        {
+          tags: ["THE POOL", "THE PICKS"],
+          title: "DECIDED ON THE LAST KICK",
+          body: [
+            "**Brent** led this pool almost wire-to-wire. He was top of the table from the middle of the group stage, posted the best group-stage haul of anyone, and correctly called all four semifinalists. On most nights, that wins it. But Brent had crowned France — and when France finished fourth, the biggest single pick on the board, worth 21 points, paid him nothing.",
+            "**Jason** chased all month and never led — until the final whistle of the final. He had Spain. Those 21 champion points landed at the very end and carried him to **211**, six clear of Brent's 205. The pool was not decided over a month of football; it was decided on the last kick, by who had the champion.",
+            "And here is the twist: only three of the fourteen backed Spain, and all three were the **DeRise brothers** — Jason (1st), Eric (3rd) and Greg (5th). They had put their Spanish heritage on the line back in June, and it paid the whole family. The largest bloc, seven of fourteen, had all crowned France, and every one of them walked away from the biggest pick with nothing. Eric, for the record, read the endgame better than anyone — both finalists and the champion — and only a quiet group stage kept him off the top.",
+          ],
+        },
+        {
+          tags: ["BEHIND THE SCENES", "CLAUDE CODE"],
+          title: "BUILT, ROUND BY ROUND, WITH CLAUDE CODE",
+          body: [
+            "This started as a group chat and a spreadsheet, and grew — week by week, across the tournament — into a live web app, built conversationally with Claude Code.",
+            "Piece by piece it gained a picks engine and group tables, a live-scoring standings feed wired straight to real match results, an auto-updating knockout bracket that reads extra time and penalties, this multi-edition analysis blog, and — right at the end — an interactive, colorblind-safe chart of the whole race for the title. Every round got its own written analysis, and the app grew faster and richer as it went. Equal parts football pool and a running experiment in building software by simply describing what you want.",
+          ],
+        },
+        {
+          tags: ["THANK YOU"],
+          title: "THANK YOU FOR PLAYING",
+          body: [
+            "Thank you to all seventeen of you who played — who argued over picks, filled out brackets, and checked the table far more often than was reasonable. That is what made it fun.",
+            "Congratulations to **Jason** on the title, to **Brent** for leading almost the entire way, and to everyone who backed a dark horse and rode it as far as it would go. It was a genuine joy to build and to run. See you in 2030. 🏆",
+          ],
+        },
+      ],
+      snapshot: finalSnapshot,
     };
   } else if (editionArg === "r16") {
     // Post–Round of 16 edition: capture the QF field (advanced.qf) + koScores.

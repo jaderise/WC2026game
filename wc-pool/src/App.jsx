@@ -2319,6 +2319,64 @@ function Analysis({ editions }) {
     );
   }
 
+  // Closing edition. Renders a champion banner, the final table (scored live from the frozen
+  // snapshot so it always matches the standings), and the written wrap-up sections carried on
+  // the edition. Prose supports **bold** spans; everything else is plain text.
+  function renderFinalRecap(playerPicks, results, names, edition) {
+    const rich = (text) => String(text).split(/(\*\*[^*]+\*\*)/g).map((seg, k) => seg.startsWith("**") && seg.endsWith("**") ? <strong key={k}>{seg.slice(2, -2)}</strong> : <React.Fragment key={k}>{seg}</React.Fragment>);
+    const champ = edition.champion;
+    const rows = names.map((n) => {
+      const sc = scorePlayer(playerPicks[n], results);
+      return { n, total: sc.total, champ: (playerPicks[n].advanced?.champ || [])[0] || "—" };
+    }).filter((r) => r.total > 0).sort((a, b) => b.total - a.total || a.n.localeCompare(b.n));
+    let lastTotal = null, lastRank = 0;
+    rows.forEach((r, i) => { if (r.total !== lastTotal) { lastRank = i + 1; lastTotal = r.total; } r.rank = lastRank; });
+    const medal = (rank) => rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : "";
+    return (
+      <>
+        <div style={{ ...cardStyle, background: C.ink, color: C.chalk, textAlign: "center", padding: "30px 18px" }}>
+          <div style={{ fontSize: 11, letterSpacing: ".16em", color: C.sun, fontFamily: "'DM Mono', monospace", marginBottom: 8 }}>WORLD CUP 2026 · CHAMPIONS</div>
+          <div style={{ fontFamily: "Anton, sans-serif", fontSize: 46, lineHeight: 1, color: C.chalk }}>{champ}</div>
+          {edition.finalLine && <div style={{ fontSize: 13, color: "#C7D0DE", marginTop: 10, lineHeight: 1.5 }}>{edition.finalLine}</div>}
+        </div>
+        <div style={cardStyle}>
+          <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+            <span style={tagStyle(C.ink)}>FINAL STANDINGS</span><span style={tagStyle(C.pitch)}>FULL TIME</span>
+          </div>
+          <h2 style={h2Style}>THE FINAL TABLE</h2>
+          <p style={{ fontSize: 12, color: C.mute, fontFamily: "'DM Mono', monospace", margin: "4px 0 14px" }}>How {rows.length} brackets finished · champion pick shown</p>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: 10.5, color: C.mute, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: ".08em", borderBottom: `2px solid ${C.line}` }}>
+            <div style={{ width: 30, textAlign: "center" }}>#</div>
+            <div style={{ flex: 1 }}>Player</div>
+            <div style={{ flex: 1, textAlign: "right" }}>Champion</div>
+            <div style={{ width: 40, textAlign: "right" }}>Pts</div>
+          </div>
+          {rows.map((r) => {
+            const won = r.rank === 1;
+            const right = r.champ === champ;
+            return (
+              <div key={r.n} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: `1px solid ${C.line}`, background: won ? "rgba(232,178,58,0.16)" : "transparent" }}>
+                <div style={{ width: 30, textAlign: "center", fontFamily: "Anton, sans-serif", fontSize: 15 }}>{medal(r.rank) || r.rank}</div>
+                <div style={{ flex: 1, fontSize: 13, fontWeight: won ? 800 : 600 }}>{r.n}</div>
+                <div style={{ flex: 1, textAlign: "right", fontSize: 12, color: right ? C.pitch : C.mute, fontWeight: right ? 700 : 400 }}>{r.champ}{right ? " ✓" : ""}</div>
+                <div style={{ width: 40, textAlign: "right", fontFamily: "'DM Mono', monospace", fontSize: 13, fontWeight: 700 }}>{r.total}</div>
+              </div>
+            );
+          })}
+        </div>
+        {(edition.sections || []).map((sec, i) => (
+          <div key={i} style={cardStyle}>
+            <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+              {(sec.tags || []).map((t, j) => <span key={j} style={tagStyle(j === 0 ? C.ink : C.pitch)}>{t}</span>)}
+            </div>
+            <h2 style={h2Style}>{sec.title}</h2>
+            {(sec.body || []).map((para, j) => <p key={j} style={pStyle}>{rich(para)}</p>)}
+          </div>
+        ))}
+      </>
+    );
+  }
+
   function renderChaos(playerPicks, results, names) {
     const ko = results.koScores || {};
     const bracket = names.filter((n) => (playerPicks[n].advanced?.champ || []).length || (playerPicks[n].advanced?.sf || []).length);
@@ -2876,6 +2934,9 @@ function Analysis({ editions }) {
                 }
                 if (card === "leaderboard") {
                   return <React.Fragment key={ci}>{renderLeaderboard(playerPicks, snapResults, names, edition.leaderboardNote)}</React.Fragment>;
+                }
+                if (card === "final-recap") {
+                  return <React.Fragment key={ci}>{renderFinalRecap(playerPicks, snapResults, names, edition)}</React.Fragment>;
                 }
                 if (card === "consensus") {
                   const matchRange = edition.matchRange || [1, 24];
