@@ -516,8 +516,9 @@ async function main() {
           tags: ["BEHIND THE SCENES", "CLAUDE CODE"],
           title: "BUILT, ROUND BY ROUND, WITH CLAUDE CODE",
           body: [
-            "This started as a group chat and a spreadsheet, and grew — week by week, across the tournament — into a live web app, built conversationally with Claude Code.",
-            "Piece by piece it gained a picks engine and group tables, a live-scoring standings feed wired straight to real match results, an auto-updating knockout bracket that reads extra time and penalties, this multi-edition analysis blog, and — right at the end — an interactive, colorblind-safe chart of the whole race for the title. Every round got its own written analysis, and the app grew faster and richer as it went. Equal parts football pool and a running experiment in building software by simply describing what you want.",
+            "It began with a simple want. Jason was looking for a game that would let the group follow the World Cup closely — and didn't like anything he found online. With less than 48 hours until the first kickoff, he threw together a rough prototype in a Claude chat, just to see if the idea was even possible. It was.",
+            "So he moved over to Claude Code, wrote a set of base instructions, and started building for real. From there it grew round by round, entirely by conversation: a picks engine and live group tables, a standings feed wired straight to real match results, and a knockout bracket that fed itself through extra time and penalties. When cold loads got slow, the data layer was tuned until it was quick again. Every round earned its own written edition — The Cull after the Round of 32, The Elite Eight, The Final Four — and in the final days the app gained an interactive, colorblind-safe chart of the whole race for the title. This wrap-up is the last of those editions.",
+            "Equal parts football pool and a running experiment in building software by simply describing what you want — from a 48-hour prototype to the app you are reading this in.",
           ],
         },
         {
