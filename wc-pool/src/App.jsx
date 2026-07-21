@@ -1132,9 +1132,13 @@ function PointsChart({ rows, results }) {
     });
     // Per-day leader total and per-day rank (1 = best), then attach gap/rank tracks.
     const leaderAt = dates.map((_, i) => Math.max(...series.map((s) => s.pts[i])));
+    // Standard competition ranking ("1-2-3-3-5"): tied totals share the higher rank and the
+    // next rank is skipped, so a tie for 3rd shows both players on the #3 row (no #4).
     const rankAt = dates.map((_, i) => {
       const ord = [...series].sort((a, b) => b.pts[i] - a.pts[i]); const m = {};
-      ord.forEach((s, r) => { m[s.name] = r + 1; }); return m;
+      let lastPts = null, lastRank = 0;
+      ord.forEach((s, idx) => { if (s.pts[i] !== lastPts) { lastRank = idx + 1; lastPts = s.pts[i]; } m[s.name] = lastRank; });
+      return m;
     });
     series.forEach((s) => {
       s.gap = s.pts.map((p, i) => leaderAt[i] - p);
