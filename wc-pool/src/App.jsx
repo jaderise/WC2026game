@@ -2336,6 +2336,9 @@ function Analysis({ editions }) {
     let lastTotal = null, lastRank = 0;
     rows.forEach((r, i) => { if (r.total !== lastTotal) { lastRank = i + 1; lastTotal = r.total; } r.rank = lastRank; });
     const medal = (rank) => rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : "";
+    // Rows for the embedded race charts, built from the frozen snapshot so the edition is
+    // self-contained (PointsChart filters to the knockout brackets itself).
+    const chartRows = names.map((n) => ({ name: n, picks: playerPicks[n] }));
     return (
       <>
         <div style={{ ...cardStyle, background: C.ink, color: C.chalk, textAlign: "center", padding: "30px 18px" }}>
@@ -2375,6 +2378,7 @@ function Analysis({ editions }) {
             </div>
             <h2 style={h2Style}>{sec.title}</h2>
             {(sec.body || []).map((para, j) => <p key={j} style={pStyle}>{rich(para)}</p>)}
+            {sec.chart === "race" && <PointsChart rows={chartRows} results={results} />}
           </div>
         ))}
       </>

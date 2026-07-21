@@ -513,6 +513,14 @@ async function main() {
           ],
         },
         {
+          tags: ["THE RACE", "DAY BY DAY"],
+          title: "THE WHOLE RACE, IN TWO CHARTS",
+          chart: "race",
+          body: [
+            "Every day of the tournament, plotted two ways. Rank over time is the bump chart — who sat where in the table, day by day; the top four finishers are in colour, the rest in grey. Gap to leader shows the same race as points behind the front-runner. Tap any line to trace a single player.",
+          ],
+        },
+        {
           tags: ["BEHIND THE SCENES", "CLAUDE CODE"],
           title: "BUILT, ROUND BY ROUND, WITH CLAUDE CODE",
           body: [
